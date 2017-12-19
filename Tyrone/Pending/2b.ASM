@@ -1,0 +1,89 @@
+.MODEL SMALL
+.STACK 64
+.DATA
+
+num DB 1,2,3,4,5
+tens DW 4,3,2,1,0
+hexresult DW ?
+two DB 2
+shift DB ?
+output DB 30H,30H,30H,30H,30H
+
+
+.CODE
+
+MAIN PROC
+ MOV AX,@DATA
+ MOV DS,AX
+
+ MOV BX,0
+ MOV SI,0
+
+OP1:
+ MOV AX,0
+ MOV AL,num[SI]
+ DIV two
+ MOV shift,AL
+ CMP AH,0
+ JLE EVEN
+
+ODD:
+ MOV AX,0
+ MOV AX,tens[SI]
+ MOV CL,shift
+ DEC CL
+ CMP CL,255
+ JNE MORETHANONE
+ ADD BX,AX
+ INC SI
+ CMP SI,4
+ JBE OP1
+ JA B4PRINT
+
+MORETHANONE:  
+ SHL AX,CL
+ ADD AX,tens[SI]
+ ADD BX,AX
+ INC SI
+ CMP SI,4
+ JBE OP1
+ JA B4PRINT
+
+EVEN: 
+ MOV AX,0
+ MOV AX,tens[SI]
+ MOV CL,shift
+ SHL AX,CL
+ ADD BX,AX
+ INC SI
+ CMP SI,4
+ JBE OP1
+ JA B4PRINT
+
+B4PRINT:
+ MOV hexresult,BX
+
+ MOV SI,0
+PRINT:
+ MOV DX,0
+ MOV AX,hexresult
+ DIV tens[3]
+ 
+ ADD output[SI],DL
+
+ MOV AH,02H
+ MOV DL,output[SI]
+ INT 21H
+
+ INC SI
+
+ CMP SI,4
+ JBE PRINT
+ JA EXIT
+
+EXIT:
+ MOV AX,4C00H
+ INT 21H
+
+MAIN ENDP
+END MAIN

@@ -1,0 +1,56 @@
+.MODEL SMALL
+.STACK 64
+.DATA
+
+num DW 1,2,3,4,5
+tens DW 10000,1000,100,10,1
+hexresult DW ?
+print DW DUB 5 (30H)
+
+
+.CODE
+
+MAIN PROC
+ MOV AX,@DATA
+ MOV DS,AX
+
+ MOV BX,0
+ MOV SI,0
+
+OP1:
+ MOV AX,num[SI]
+ MUL tens[SI]
+ ADD BX,AX
+ INC SI
+
+ CMP SI,5
+ JBE OP1
+ JA B4PRINT
+
+B4PRINT:
+ MOV hexresult,BX
+
+ MOV SI,0
+PRINT:
+ MOV DX,0
+ MOV AX,hexresult
+ DIV tens[3]
+ 
+ ADD print[SI],DX
+
+ MOV AH,02H
+ MOV DL,print[SI]
+ INT 21H
+
+ INC SI
+
+ CMP SI,5
+ JBE PRINT
+ JA EXIT
+
+EXIT:
+ MOV AX,4C00H
+ INT 21H
+
+MAIN ENDP
+END MAIN
