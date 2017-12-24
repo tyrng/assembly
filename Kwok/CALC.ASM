@@ -9,9 +9,7 @@
 	str1 db "Input here >> $"
 	str2 db 13, 10, "Output here >> $"
 
-	nl db 13, 10, "$"
-
-	two db 2
+	num db 2
 	Q db 0
 	ten db 0Ah
 
@@ -41,15 +39,14 @@ main proc
 	mov si, cx
 L1:
 	xor ax, ax
-
 	mov al, INPUT[si-1]
 
+	cmp al, "."
+	JE SKIP
+
 	sub al, 30h
-
-	mul two
-
+	mul num
 	add al, Q
-
 	div ten
 
 	add ah, 30h
@@ -57,19 +54,23 @@ L1:
 
 	mov Q, al
 
+BACK:
 	dec si
+	loop L1	
 
-	loop L1
+	jmp OUTP
 
+SKIP:
+	mov bl, "."
+	mov OUTPUT[si-1], bl
+	xor bx, bx
+	jmp BACK
 
-
-;output -----------------------------------------------
+OUTP:
 	mov ah, 9
 	lea dx, OUTPUT
 	int 21h
 
-
-    EXT:
 	mov ah, 4ch
 	int 21h	
 main endp
