@@ -42,6 +42,7 @@ powDivisor DW 100, 10, 1
 
 ;---Dramatic text effect 
 drama DB "COMMENCING LOAN COMPUTATION...$"
+looper DB 1
 
 .CODE
 
@@ -49,9 +50,13 @@ MAIN PROC
  MOV AX,@DATA
  MOV DS,AX
 
+ 
+ TESTING:
  CALL _STRINGVAR
- CALL _FORMULAOP
+ CALL _POWLOOP
+ CALL _FINALOAN
  CALL _VARSTRING
+                               
 
 EXIT:
  MOV AX,4C00H
@@ -78,20 +83,23 @@ STRINGVAR:
  RET
 _STRINGVAR ENDP
 
-_FORMULAOP PROC ; FORMULA OPERATIONS 
- ;=============Setting up loop================
+
+
+_POWLOOP PROC   
+ ;====================WELCOME TO THE POWER LOOP FUNCTION==============
  
- ;---Intro
+ ;---Intro (NOT NEEDED)
  MOV AH,09H
  LEA DX,drama
  INT 21H
  
+ ;---Newline
  MOV AH,09H
  LEA DX,nLine
  INT 21H
  
  ;---LOOP SETTINGS---
- MOV AX, 0000H
+ XOR AX, AX
  MOV AL, nVar
  MUL tVar
   
@@ -103,8 +111,8 @@ _FORMULAOP PROC ; FORMULA OPERATIONS
  
  BIGASSLOOP:
 
- MOV BX, 0
- MOV DX, 0
+ XOR BX, BX
+ XOR DX, DX
  
  MOV SI, 0
  MOV DI, 6
@@ -165,9 +173,6 @@ _FORMULAOP PROC ; FORMULA OPERATIONS
  LOOP BIGASSLOOP
  
  
- 
- ;==========CALCULATION PART II===========
- ;(Multiplying loan with compounded rate)
  XOR AX, AX
  XOR BX, BX
  XOR SI, SI
@@ -183,14 +188,23 @@ _FORMULAOP PROC ; FORMULA OPERATIONS
  MOV fpString[SI], DX
  
  CMP SI, 0
- JE SETUP_BM
+ JE RETURN2
  JA DECREMENT
  
  DECREMENT:
  SUB SI, 2
  JMP FP_SEPERATOR
  
+ RETURN2:
  
+ RET
+ _POWLOOP ENDP
+ 
+ 
+ _FINALOAN PROC
+ 
+ ;==========CALCULATION PART II===========
+ ;(Multiplying loan with compounded rate)
  SETUP_BM:
  XOR AX, AX
  XOR BX, BX
@@ -288,7 +302,7 @@ _FORMULAOP PROC ; FORMULA OPERATIONS
  ;MOV outputVar,BX ; TEMPORARY
  
  RET
-_FORMULAOP ENDP   
+_FINALOAN ENDP   
 
 _VARSTRING PROC ; CONVERT SINGLE VARIABLE TO OUTPUT STRING
  MOV SI,0
@@ -343,5 +357,11 @@ EXIT2:
  
  RET        
 _VARSTRING ENDP
+
+
+_TEST PROC
+    
+ RET
+_TEST ENDP
     
 END MAIN
