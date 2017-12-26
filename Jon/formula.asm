@@ -28,7 +28,7 @@ cString DW 1,0,1,0
 ;---Floating point variables
 fPoint DW ?
 fpString DW ?,?,?,?
-
+              
 ;---Total compounded loan variables
 totalLoan DW 0
 decimalPoint DW 0
@@ -42,7 +42,7 @@ powDivisor DW 100, 10, 1
 
 ;---Dramatic text effect 
 drama DB "COMMENCING LOAN COMPUTATION...$"
-looper DB 1
+looper DB 2
 
 .CODE
 
@@ -56,6 +56,15 @@ MAIN PROC
  CALL _POWLOOP
  CALL _FINALOAN
  CALL _VARSTRING
+  
+ XOR AX, AX 
+ MOV AL, looper
+ SUB AL, 1
+ MOV looper, AL
+ 
+ CMP AL, 0
+ JE EXIT
+ JA TESTING
                                
 
 EXIT:
@@ -196,6 +205,9 @@ _POWLOOP PROC
  JMP FP_SEPERATOR
  
  RETURN2:
+ MOV AX, fPoint
+ XOR AX, AX
+ MOV fPoint, AX
  
  RET
  _POWLOOP ENDP
@@ -293,8 +305,24 @@ _POWLOOP PROC
  
  ;---RETURN FINAL COMPOUNDED LOAN VALUES
  RETURN:
+ XOR DX, DX
+ ;---Split decimal point---
+ MOV AX, decimalPoint
+ DIV tens[6]
+ 
+ ADD dpString[0], AL
+ ADD dpString[1], DL
+ 
+ ;---Move total loan to outputVar---
  MOV AX, totalLoan
  MOV outputVar, AX
+ 
+ ;---Clear decimalPoint var---
+ XOR AX, AX
+ MOV decimalPoint, AX
+ 
+ ;---Clear totalLoan---
+ MOV totalLoan, AX
  
  
  ;-----------------------------
@@ -330,19 +358,11 @@ VARSTRING:
  DECIMAL_PRINT:
  XOR DX, DX
  
- MOV AH, 02H    ;---Print out '.'
+ MOV AH, 02H    ;---Print out '.'---
  MOV DL, 2EH
  INT 21H
  
- XOR DX, DX
- 
- MOV AX, decimalPoint
- DIV tens[6]
- 
- ADD dpString[0], AL
- ADD dpString[1], DL
- 
- MOV AH, 02H
+ MOV AH, 02H    ;---Print out decimals---
  MOV DL, dpString[0]
  INT 21H
  
@@ -350,10 +370,23 @@ VARSTRING:
  MOV DL, dpString[1]
  INT 21H
  
- JMP EXIT2
+ MOV AH, 09H
+ LEA DX, nLine
+ INT 21H
  
-EXIT2:
- JMP EXIT 
+ JMP CLEAR_PRINT
+ 
+ CLEAR_PRINT:
+ MOV SI,0
+ MOV DI,0
+ 
+ RESETOUTPUT: 
+ MOV StringOutput[SI],30H
+ MOV dpString[DI],30H
+ INC SI
+ INC DI
+ CMP SI,5
+ JB RESETOUTPUT 
  
  RET        
 _VARSTRING ENDP
