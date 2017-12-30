@@ -149,7 +149,7 @@ L3:
     je UP          
     cmp al, 50h
     je DOWN      
-    cmp al, 0Dh
+    cmp al, 1Ch
     je ENTER         
   
 B1:                                                               
