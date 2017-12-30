@@ -9,9 +9,10 @@
 	str1 db "Input here >> $"
 	str2 db 13, 10, "Output here >> $"
 
-	num db 2
-	Q db 0
+	R db 0
 	ten db 0Ah
+	hundred db 64h            
+	two dw 2
 
 	OUTPUT DB 10 DUP (?), "$"
 	
@@ -33,44 +34,41 @@ main proc
 	int 21h
 
 ;-----------------------------------------------------
-	xor cx, cx
-
+                          
+    xor cx, cx 
+    
 	mov cl, ACT
 	mov si, cx
 L1:
-	xor ax, ax
+	xor ax, ax     
+			
 	mov al, INPUT[si-1]
-
-	cmp al, "."
-	JE SKIP
-
-	sub al, 30h
-	mul num
-	add al, Q
-	div ten
-
-	add ah, 30h
-	mov OUTPUT[si], ah
-
-	mov Q, al
+	sub al, 30h 
+	
+	cmp si, 1
+	JE FLOAT       
+	
 BACK:
+	div hundred
+	
+	add ah, 30h
+	mov OUTPUT[si], ah                   
+                         
 	dec si
-	loop L1
 
-	add al, 30h
-	cmp al, 0
-	JE ZERO
+	loop L1      
+    
+    	jmp OUTP
+    
 
-	jmp OUTP
-
-SKIP:
+FLOAT:
 	mov bl, "."
 	mov OUTPUT[si], bl
-	jmp BACK
-
-ZERO:				;remove front unit if ah is 0
-	add OUTPUT[si], al
-	jmp OUTP
+	
+	dec si        
+       
+	jmp BACK  
+	
 
 OUTP:
 	mov ah, 9
