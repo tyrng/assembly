@@ -18,7 +18,7 @@
     menu1 db "1. Loan$" 
     menu2 db "2. Exit Program$"  
     string db "This is loan$"
-	  dos box doesnt recognise 1ch as enter        
+	  ;dos box doesnt recognise 1ch as enter        
 	arrow db ?          ;this stores input of arrow  
 	enter db ?          ;this stores input of enter                           
 	row db 0Eh                             
@@ -102,7 +102,9 @@ L1:
 L2:
     mov bl, password[si]
     cmp pass[si], bl
-    jne L1
+    jne L1  
+    
+    inc si
     
     loop L2    
     
