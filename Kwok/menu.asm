@@ -1,31 +1,54 @@
 .model small
 .stack 100
-.data
+.data                                
+    ;LOGIN---------------------------
+    loginstr db "Enter pass code $"
+    
+    ARRAY LABEL BYTE
+    max db 20
+    act db ?
+    pass db 10 dup("$")                 
+    
+    password db "eewhore"          ;shhh...
+    
+    errorstr db "Pass code doesn't match!$"
+
+    ;MENU ---------------------------
     menu db "Bank Loan Machine$"
     menu1 db "1. Loan$" 
     menu2 db "2. Exit Program$"  
     string db "This is loan$"
-	
+	                             
+	arrow db ?          ;this stores input of arrow                             
 	row db 0Eh                             
 	                               	                               
 .code
 main proc
 	mov ax, @data
 	mov ds, ax    
-    
-    call _menuScreen
-                
+                     
+    call _login                    
+    call _menu 
+EXIT:                
     mov ah, 4ch
     int 21h                     
-main endp     
+main endp  
+
+cls proc
+    mov ax, 0003h
+    int 10h         
+    xor ax,ax
+          
+    ret
                    
-_print proc  
+print proc  
     mov ah, 9
-    int 21h
-    
+    int 21h    
+    xor dx,dx
+        
     ret                   
              
-_color proc
+color proc
     mov ax, 0920h       ;color focus      
     mov dl, 16h         ;col : 24d
     mov cx, 0017
@@ -33,72 +56,109 @@ _color proc
     
     ret
 
-_cursor proc
+cursor proc    
     mov ah, 2           ;next cursor
     mov dl, 16h         ;col : 24d
     mov bh, 0  
     int 10h
     
-    ret   
-            
-_menuScreen proc 
-        mov ax, 0200h       ;set cursor to middle     
-    mov bh, 0000        ;page 0
+    ret    
+    
+center_screen proc
+    mov ax, 0200h       ;set cursor to middle     
+    mov bh, 0           ;page 0
     mov dx, 0D16h       ;center
     int 10h
+ 
+    ret       
+       
+_login proc     
+L1:
+    call cls
     
+    mov dh, 0Dh
+    call cursor                      
+                          
+    lea dx, loginstr
+    call print 
+                 
+    mov dh, 0Eh
+    call cursor
+    
+    mov bx, 00F0h
+    call color  
+    
+    mov dh, 0Eh
+    call cursor
+                 
+    mov ah, 0Ah           
+    lea dx, ARRAY
+    int 21h  
+             
+    xor cx, cx
+    mov cx, 7       ;change this as well when you change password 
+    mov si, 0             
+L2:
+    mov bl, password[si]
+    cmp pass[si], bl
+    jne L1
+    
+    loop L2    
+    
+    ret     
+            
+_menu proc 
+    call center_screen
     ;set background color here  
              
     lea dx, menu        ;print menu
-    call _print    
-
-    
-    xor dx, dx
-                   
+    call print    
+                  
     mov dh, row        ;set row to 14 
-    call _cursor
+    call cursor
                                         
-    mov bx, 00F0h         
-    call _color  
+    mov bx, 00F0h      ;point to first option   
+    call color  
     
                             
-L1:              
+L3:              
     mov dh, 0Eh
-    call _cursor  
+    call cursor  
     
     lea dx, menu1
-    call _print 
+    call print 
                
     mov dh, 0Fh              
-    call _cursor
+    call cursor
     
     lea dx, menu2
-    call _print         
+    call print         
 
             
     mov ah, 0
-    int 16h  
+    int 16h   
+    
+    mov arrow, ah
            
     mov dh, row
-    call _cursor
-                         
-    cmp al, "w"         ;arrow key selection
+    call cursor
+                 
+    mov al, arrow
+                            
+    cmp al, 48h        ;arrow key selection
     je UP          
-    cmp al, "s"
+    cmp al, 50h
     je DOWN      
     cmp al, 0Dh
-    je ENTER
-    cmp al, "x"
-    je EXIT      
-    
-                                                        
-B1:       
-    loop L1  
+    je ENTER         
+  
+B1:                                                               
+    loop L3  
       
     
 UP:           
     mov bx, 000Fh      ;set color back to normal
-    call _color
+    call color
     
     dec row        ;E - 1 = D
     
@@ -108,10 +168,10 @@ UP:
 
 U_BACK:    
     mov dh, row
-    call _cursor     
+    call cursor     
     
     mov bx, 00F0h         
-    call _color
+    call color
     
     jmp B1      
               
@@ -123,7 +183,7 @@ U_RESET:
       
 DOWN:                        
     mov bx, 000Fh   ;set color back to normal
-    call _color
+    call color
             
     inc row        
     
@@ -133,10 +193,10 @@ DOWN:
          
 D_BACK:    
     mov dh, row
-    call _cursor    
+    call cursor    
                 
     mov bx, 00F0h
-    call _color                                      
+    call color                                      
 
     jmp B1 
           
@@ -145,16 +205,12 @@ D_RESET:
     jmp D_BACK                  
       
 ;--------------------------------------------------------          
-EXIT:
-    ret
 
 ENTER:
     cmp row, 0Eh
     je LOAN_FUNC
-    cmp row, 0Fh         ;to be added more menu selection
-    je EXIT
-    
-    jmp B1           
+    ;cmp row, 0Fh         ;to be added more menu selection
+    jmp EXIT         
            
 LOAN_FUNC:          ;you can move this to your function   
     xor dx, dx
@@ -163,8 +219,8 @@ LOAN_FUNC:          ;you can move this to your function
     int 10h
 
     lea dx, string
-    call _print
+    call print
     
-_menuScreen endp
+_menu endp
                 
 end main
