@@ -18,8 +18,9 @@
     menu1 db "1. Loan$" 
     menu2 db "2. Exit Program$"  
     string db "This is loan$"
-	                             
-	arrow db ?          ;this stores input of arrow                             
+	  dos box doesnt recognise 1ch as enter        
+	arrow db ?          ;this stores input of arrow  
+	enter db ?          ;this stores input of enter                           
 	row db 0Eh                             
 	                               	                               
 .code
@@ -139,18 +140,21 @@ L3:
     int 16h   
     
     mov arrow, ah
+    mov enter, al
            
     mov dh, row
     call cursor
                  
     mov al, arrow
                             
-    cmp al, 48h        ;arrow key selection
+    cmp al, 48h         ;arrow key selection
     je UP          
     cmp al, 50h
     je DOWN      
-    cmp al, 1Ch
-    je ENTER         
+    
+    mov al, enter  
+    cmp al, 0Dh         ;enter key 0dh
+    je EN         
   
 B1:                                                               
     loop L3  
@@ -206,7 +210,7 @@ D_RESET:
       
 ;--------------------------------------------------------          
 
-ENTER:
+EN:
     cmp row, 0Eh
     je LOAN_FUNC
     ;cmp row, 0Fh         ;to be added more menu selection
