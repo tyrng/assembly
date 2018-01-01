@@ -58,8 +58,8 @@ BACK:
 	loop L1
 
 	add al, 30h
-	cmp al, 0
-	JE ZERO
+	cmp al, 30h
+	JNE ZERO
 
 	jmp OUTP
 
