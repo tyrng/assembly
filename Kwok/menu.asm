@@ -7,13 +7,11 @@
     ARRAY LABEL BYTE
     max db 20
     act db ?
-    pass db 20 dup("$")                 
+    pass db 10 dup("$")                 
     
-    password db "eewhore"          
+    password db "eewhore"          ;shhh...
     
-    errorstr db "Pass code doesn't match!$"  
-    
-    buffer db 20 dup ("$")
+    errorstr db "Pass code doesn't match!$"
 
     ;MENU ---------------------------
     menu db "Bank Loan Machine$"
@@ -74,20 +72,9 @@ center_screen proc
     int 10h
  
     ret       
-                
-clstr proc 
-    xor cx, cx
-    lea si, pass
-    lea di, buffer
-    mov cl, max
-    rep movsb
-    
-    ret
-        
-                    
+       
 _login proc     
-L1:    
-    call clstr
+L1:
     call cls
     
     mov dh, 0Dh
@@ -111,7 +98,7 @@ L1:
              
     xor cx, cx
     mov cx, 7       ;change this as well when you change password 
-    mov si, 0          
+    mov si, 0             
 L2:
     mov bl, password[si]
     cmp pass[si], bl

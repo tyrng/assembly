@@ -1,52 +1,65 @@
 .model small
 .stack 100
 .data
-	str db 6 dup ("0"), "$"     
-	str2 db 13, 10, "'c' - clear"
-	     db 13, 10, "'x' - exit"
-	     db 13, 10, "User>$"   
+	str db 6 dup ("0"), "$"
+
+	str2 db 13, 10, "'c' - clear", 13, 10, "'x' - exit", 13, 10, "User>$"
+
 	str3 db 13, 10, "Insert only 'c' and 'x'$", 13, 10
-        inp db 6 dup (?)                           
-	temp db 6 dup (?), "$"                            
-	num db 0                                         
-	scan db ? 
+
+        inp db 6 dup (?)
+
+	temp db 6 dup (?), "$"
+
+	num db 0
+
+	scan db ?
+
+	col db 0
 
 .code
 main proc
         mov ax, @data
         mov ds, ax
 
-    PRT:mov num, 5
+    PRT:mov num, 05h
 	
 	xor dx, dx
 	
 	call cls
+
+	mov col, 0h
 	call cursor
 
 	;---out 6x '0'	
+	mov ah, 9
 	lea dx, str
-	call print
+	int 21h
 
 	;---loop 1
         mov cx, 6
 	mov si, 0
 	
      L1:
-	;---reset cursor at 18:05
-	mov dl, 5			
+	;---reset cursor at 18:05		
+	mov col, 5
 	call cursor
 
 	;---in 
-	mov ah, 0
-        int 16h
+	mov ah, 1
+        int 21h
 
         mov temp[si], al
 
+	mov ah, 2
+	mov bh, 0
+        mov dh, 18h
 	mov dl, num
-	call cursor
+	int 10h	
 	
+	mov ah, 9
 	lea dx, temp
-	call print
+	int 21h
 	
 	dec num
 	inc si
@@ -55,8 +68,10 @@ main proc
 
 	;---loop or exit
    COND:		
+
+	mov ah, 9
 	lea dx, str2 
-	call print
+	int 21h
 	
 	mov ah, 1
 	int 21h
@@ -70,8 +85,9 @@ main proc
 
 	;---continue mov inp, temp
 	
+	mov ah, 9
 	lea dx, str3
-	call print
+	int 21h
 
 	loop COND
 
@@ -81,34 +97,31 @@ main proc
 	mov si, 0
      L2:	
 	mov al, 20h
-	mov temp[si], al	
+	mov temp[si],al	
 	inc si
 
 	loop L2
 	jmp PRT
 
     EXT:		
+	;---terminate
         mov ah, 4ch
         int 21h
-        main endp 
- 
+        main endp
+
 cls proc
 	mov ax, 0003h
     	int 10h 
-	ret      
-	
+	ret
+cls endp
+
 cursor proc 
 	mov ah, 2
 	mov bh, 0
-	mov dh, 16h
-	int 10h 
-	
-	ret    
+        mov dh, 18h
+	mov dl, col
+	int 10h
+	ret
+cursor endp
 
-print proc
-    mov ah, 9
-    int 21h
-    xor dx, dx 
-    
-    ret
 end main
