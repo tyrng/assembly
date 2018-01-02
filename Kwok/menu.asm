@@ -149,7 +149,7 @@ L3:
     
     lea dx, menu2
     call print         
-
+                             ;add menu3 
             
     mov ah, 0
     int 16h   
@@ -228,7 +228,7 @@ D_RESET:
 EN:
     cmp row, 0Eh
     je LOAN_FUNC
-    ;cmp row, 0Fh         ;to be added more menu selection
+    ;cmp row, 0Fh         to be added more menu selection
     jmp EXIT         
            
 LOAN_FUNC:          ;you can move this to your function   

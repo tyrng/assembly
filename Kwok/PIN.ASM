@@ -80,11 +80,10 @@ main proc
 	mov cx, 6
 	mov si, 0
      L2:	
-	mov al, 20h
-	mov temp[si], al	
-	inc si
-
-	loop L2
+	mov temp[si], 20h	
+	inc si     
+	loop L2  
+	
 	jmp PRT
 
     EXT:		
