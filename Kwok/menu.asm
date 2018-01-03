@@ -16,8 +16,7 @@
     menu db "Bank Loan Machine$"
     menu1 db "1. Loan$" 
     menu2 db "2. Exit Program$"  
-    string db "This is loan$"       
-                   
+       
 	arrow db ?          ;this stores input of arrow  
 	enter db ?          ;this stores input of enter 	                          
 	row db 0Eh                                      
@@ -26,7 +25,7 @@
 	LoanTitle db "Enter loan amount (RM 1,000 - RM 15,000) $"  
     errStr db "Max Loan Amount is 15,000$"   
     maxloan db "15000"              
-    minloan db "01000"  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;1;;;;;;;;;;;;;;;;;;;;;;;;;;;;<---
+    minloan db "01000"                      ;<---min loan do this
     decStr db "Confirm Amount? $"  
     contStr db "Continue ?$"       
     redoStr db "Retry enter Year? $"
@@ -36,9 +35,10 @@
     
     cash db 5 dup (20h), "$" 
     YN db ?   
-    col db 25h              ;always point to no 
-    num db ?                                          
-    bool db ?
+    col db 25h                      ;always point to no 
+    num db ?                        ;row print                   
+    bool db ?                       ;no choice      
+    
     ;INTEREST-TABLE-----------------------------
     int_Table1 db "Interest Rate & Loan Duration$"
     int_Table2 db "Loan Duration     1-3 years       4-6years        7-10 years$"
