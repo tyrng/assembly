@@ -3,14 +3,14 @@
 .data                                
     ;LOGIN---------------------------     
     ARRAY LABEL BYTE
-    max db 20
+    max db 15
     act db ?
-    pass db 20 dup("$")   
+    pass db 15 dup("$")   
     
     loginstr db "Enter pass code $"                       
     password db "123"              
     errorstr db "Pass code doesn't match!$"      
-    buffer db 20 dup ("$")
+    buffer db 15 dup ("$")
 
     ;MENU ---------------------------
     menu db "Bank Loan Machine$"
@@ -22,12 +22,14 @@
 	enter db ?          ;this stores input of enter 	                          
 	row db 0Eh                                      
 	
-	;LOAN-------------------------------     
-    errStr db "Max Loan Amount is 15000$"   
+	;LOAN-------------------------------   
+	LoanTitle db "Enter loan amount (RM 1,000 - RM 15,000) $"  
+    errStr db "Max Loan Amount is 15,000$"   
     maxloan db "15000"              
-    minloan db "01000"  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;<---
-    loanStr db "Confirm Amount? $"
-    contStr db "Continue ?$" 
+    minloan db "01000"  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;1;;;;;;;;;;;;;;;;;;;;;;;;;;;;<---
+    decStr db "Confirm Amount? $"  
+    contStr db "Continue ?$"       
+    redoStr db "Retry enter Year? $"
     yes db "Yes$"
     no db "No$"      
     zero db 5 dup (30h), "$"
@@ -35,7 +37,8 @@
     cash db 5 dup (20h), "$" 
     YN db ?   
     col db 25h              ;always point to no 
-    num db ?
+    num db ?                                          
+    bool db ?
     ;INTEREST-TABLE-----------------------------
     int_Table1 db "Interest Rate & Loan Duration$"
     int_Table2 db "Loan Duration     1-3 years       4-6years        7-10 years$"
@@ -79,7 +82,7 @@ print proc
              
 color proc
     mov ax, 0920h       ;color focus      
-    mov dl, 28h         ;col : 24d
+    mov dl, 20h         ;col : 24d
     int 10h 
     
     ret
@@ -92,9 +95,9 @@ cursor proc
     ret    
     
 ctscr proc
-    mov ax, 0200h       ;set cursor to middle     
+    mov ax, 0200h       ;set cursor to middle      title set
     mov bh, 0           ;page 0
-    mov dx, 0D28h       ;center
+    mov dx, 0C1Eh       ;center
     int 10h
  
     ret       
@@ -110,7 +113,7 @@ clstr proc
  
 clbyte proc
 L7:     
-    mov cash[si], 30h         ;clear input
+    mov cash[si], 20h         ;clear input
     inc si
         
     loop L7  
@@ -120,23 +123,22 @@ L7:
 _login proc     
 L1:    
     call clstr
-    call cls   
-    
-    mov dx, 0D28h   
-    call cursor                      
+    call cls 
+    call ctscr  
+                        
                  
     xor dx, dx                         
     lea dx, loginstr
     call print 
                  
-    mov dx, 0E28h
+    mov dx, 0E1Dh
     call cursor
     
     mov bx, 00A0h     
     mov cx, 0017
     call color  
     
-    mov dx, 0E28h
+    mov dx, 0E1Eh
     call cursor
                  
     mov ah, 0Ah        
@@ -160,28 +162,28 @@ L2:
 _menu proc   
 MENU_SCR:          
     call cls
-    call ctscr          
-                                
-    lea dx, menu        ;print menu
-    call print    
+    call ctscr                  
+    
+    lea dx, menu
+    call print
                   
     mov dh, row        ;set row to 14      
-    mov dl, 28h         ;col : 24d
+    mov dl, 1Eh         ;col : 24d
     call cursor
                                         
     mov bx, 00A0h      ;point to first option  
     mov cx, 0017 
     call color  
-    
+
                             
 L3:              
-    mov dx, 0E28h
+    mov dx, 0E1Eh
     call cursor  
     
     lea dx, menu1
     call print 
                
-    mov dx, 0F28h              
+    mov dx, 0F1Eh              
     call cursor
     
     lea dx, menu2
@@ -195,7 +197,7 @@ L3:
     mov enter, al
            
     mov dh, row     
-    mov dl, 28h         ;col : 24d
+    mov dl, 1Eh         ;col : 24d
     call cursor
                  
     mov al, arrow
@@ -226,7 +228,7 @@ UP:
 
 U_BACK:    
     mov dh, row     
-    mov dl, 28h     
+    mov dl, 1Eh     
     call cursor     
     
     mov bx, 00A0h            
@@ -252,7 +254,7 @@ DOWN:
          
 D_BACK:    
     mov dh, row    
-    mov dl, 28h         
+    mov dl, 1Eh         
     call cursor    
                 
     mov bx, 00A0h            
@@ -288,115 +290,196 @@ _menu endp
             
             
 Loan_Amount proc
-L_restart:     
+L_restart:          ;press no to go her   
+    mov cx, 5       ;clear byte of cash if no
+    xor si, si
+    call clbyte
+    
     call cls
-    call ctscr             
+    call ctscr           
+                     
+    mov dx, 0C1Ah       ;about top center       ;if jump range issue send this to new function
+    call cursor      
+                                
+    lea dx, LoanTitle     
+    call print                    
     
-    lea dx, zero
+    mov dx, 0E24h       ;24 as center   #fixed
+    call cursor
+    
+    lea dx, zero    ;00000
     call print
+                                         
+;money-------------------------------------------------------                                         
+    call Loan_Input   
+     
+    cmp bool, 0
+    je L_enter
+                 
+    jmp L_choice                      
+
+LoanDuration:                     ;redo if wrong input    
+    call Loan_Duration      
+                                       
+    call Confirmation
+    call Loan_Confirmation  ;YES / NO     
     
+    cmp col, 1Eh            ;YES = go to jon's calculation 
+    ;je JON'S CALCULATION                                           <---- take cash variable to tyrone conversion
+    mov dx, 1122h       ;fixed 22
+    call cursor                                
+    
+    mov bx, 04h           ;Change this color when you change background     
+    mov cx, 20
+    call color  
+                                
+    lea dx, redoStr
+    call print
+                       
+    call Loan_Confirmation
+    
+    cmp col, 1Eh            ;RETRY? YES = go back loanduration              
+    je LoanDuration
+    
+    jmp L_choice
+
+L_enter:                    ;successfully entered loan amount
+    call Confirmation    
+    call Loan_Confirmation   
+       
+    cmp col, 1Eh            ;YES
+    je LoanDuration                                                                      
+
+L_choice:    
+    call Continue           ;Continue?   
+    call Loan_Confirmation  ;YES / NO     
+    
+    cmp col, 1Eh            ;1Eh = YES                   
+    je L_restart
+                                                
+    ret
+Loan_Amount endp    
+
+
+
+
+
+Loan_Input proc
     mov cx, 5
     mov si, 0        
-    mov num, 2Ch
+    mov num, 28h    ;print moves forward
 L4:               
-    mov dx, 0D2Ch
+    mov dx, 0E28h   ;fixed col : 26h 
     call cursor  
-    
 	
-    mov ah, 0
-    int 16h     
+    mov ah, 1
+    int 21h     
                 
     cmp al, 0Dh           ;end input
     je L_enter    
     cmp al, 30h
-    jb L_err
+    jb L_error
     cmp al, 39h
-    ja L_err    
+    ja L_error    
                            
     mov cash[si], al  
     
-    mov dh, 0Dh
+    mov dh, 0Eh
     mov dl, num
-	call cursor   	
-	dec num	
+	call cursor  
+	 	
+	dec num	         ;left each time
+	
 	lea dx, cash         ;not more than 15000
-	call print    	
-	cmp cx, 1
-    je LIMIT     
+	call print
+	    	
+	cmp cl, 1
+    je LIMIT                                      
 R1:	
 	inc si   	
-	loop L4 	  
-	jmp L_enter 
-
-L_back1:               ;resume loop
-    mov cx, 1 
-    jmp R1	
-
+	loop L4 	
+	            
+	mov bool, 0                       
+skip1:
+	  
+	ret 
+      
+;Constraints----------------          
+        
 LIMIT:   
-    mov cx, 5   
-    mov si, 0
+    cmp cash[0], 1
+    jbe R2    
+    cmp cash[1], 5
+    jbe R2
+
+    mov cx, 3                                                     ;<------------------fix this
+    mov si, 2
 L6:        
     mov al, cash[si]
     cmp al, maxloan[si]         ;compare 15000
-    jbe L_enter                     ;reset
-    loop L6
-        
-L_err:            
-    call Loan_error   
-    jmp L_back2    	      ; get yes and no    
-;------------------------------------------------  	
-L_enter:          
-    mov dx, 1122h          ;11:12
-    call cursor
-  
-    lea dx, loanstr       ;confirm amount
-    call print
-                  
-    mov ah, 1
-    int 21h
- 
-    cmp al, "y"
-    call Loan_Duration    ;je ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   
-L_right:          
+    ja L_error                     ;reset     
+    
+    inc si
+    loop L6                                         
+    
+R2:                                    ;resume loop 
+    mov cx, 1 
+    jmp R1	      
+    
+L_error:            
+    call Loan_error         ;Get error msg and clear content    
+    mov bool, 1
+    jmp skip1
+    
+Loan_Input endp    
+
+
+
+Loan_Confirmation proc     ;THIS FUNCTION FOR YES AND NO
+    
+    jmp L_GOTO                                      
+    
+;---------------------------------------------------    
+    
+L_right:                  ;NO DECISION
     mov dx, 141Fh          ;print yes coord - 1
-    call cursor
-    mov col, 25h 
+    call cursor 
 
     mov bx, 000Ah
-    mov cx, 0005
+    mov cx, 5
     call color  
     
-L_back2:                  ;start coordinate first option
+L_GOTO:                  ;start coordinate first option
     mov dx,1425h
-    call cursor
+    call cursor    
+       
+    mov col, 25h       ;25 indicates NO (right)
     
     mov bx, 00A0h      ;adjust coord
-    mov cx, 0004
+    mov cx, 4
     call color
     
-    jmp L_condition
-L_farjmp:
-    jmp L_restart                      
+    jmp L_condition                                
     
-L_left:       
+L_left:                 ;YES DECISION 
     mov dx, 1425h
     call cursor
 
     mov bx, 000Ah      ;point to first option
-    mov cx, 0004   
+    mov cx, 4   
     call color
     
-    mov col, 20h
-    
     mov dx, 141Fh
-    call cursor
+    call cursor 
+    
+    mov col, 1Eh        ;1E indicates YES (left)
     
     mov bx, 00A0h  
-    mov cx, 0005
-    call color             ;change cx to 4 add own function
+    mov cx, 5
+    call color             
 
-L_condition:          
-    call Loan_condition
+L_condition:                    ;HERE IS FUNCTION
+    call Loan_condition         ;PRINT YES AND NO
     
     mov ah, 0
     int 16h    
@@ -413,40 +496,57 @@ L_condition:
     cmp enter, 0Dh 
     je L_end
 
-    loop L_condition          ;loop left and right  
+    loop L_condition            ;loop left and right  
     
-L_end:             ;return    
-    cmp col, 20h
-    je L_farjmp    
+L_end:                  ;return brings the content of column    left and right  
     
-    mov cx, 5
-    xor si, si
-    call clbyte
-                                                    
     ret
-Loan_Amount endp               
+Loan_Confirmation endp                   
+    
+Confirmation proc           ;print Confirm     
+    mov dx, 1122h
+    call cursor                                
+    
+    mov bx, 04h           ;Change this color when you change background     
+    mov cx, 20
+    call color  
+    
+    lea dx, decStr          ;Confirm Input?
+    call print     
+    
+    ret
+    
+
+Continue proc                   ;print continue 
+    mov dx, 1122h               ;print below 
+    call cursor
+    
+    mov bx, 04h           ;Change this color when you change background     
+    mov cx, 20
+    call color 
+    
+    lea dx, contStr             ;continue?
+    call print  
+                           
+    ret                       
+                           
 
 Loan_error proc
-    mov dx, 1021h               ;error display
+    mov dx, 101Eh               ;error display
     call cursor
  
     lea dx, errStr              
     call print       
               
-    mov cx, 5 
-    lea bx, cash 
-    call clbyte          ;clear byte
-    
-    mov dx, 1122h        ;print below 
-    call cursor
-    
-    lea dx, contStr       ;continue?
-    call print            
+    mov cx, 5           
+    xor si, si
+    lea bx, cash         
+    call clbyte                 ;clear byte          
     
     ret
 
-Loan_condition proc
-    mov dx, 1420h         ;20h
+Loan_condition proc             ;THIS PRINTS YES AND NO
+    mov dx, 1420h               ;14h 20h 
     call cursor         
     
     lea dx, yes
@@ -462,25 +562,27 @@ Loan_condition proc
 
 
 Loan_Duration proc 
-    call cls
-    call ctscr    
+    call cls     
+    
+    mov dx, 0909h
+    call cursor
     
     lea dx, int_Table1
     call print        
                
-    mov dx, 0E23h                     
-    call cursor
+    mov dx, 0A09h                     ;9h col 
+    call cursor                         
     
     lea dx, int_Table2
     call print    
     
-    mov dx, 0F23h                     
+    mov dx, 0B09h                     
     call cursor
     
     lea dx, int_Table3
     call print    
     
-    mov dx, 1025h                     
+    mov dx, 0C09h                     
     call cursor
     
     lea dx, intStr
@@ -489,14 +591,14 @@ Loan_Duration proc
     lea dx, cash    
     call print    
     
-    mov dx, 1125h                     
+    mov dx, 0D09h                     
     call cursor
     
     lea dx, intDur
     call print
                
-    mov ah, 0
-    int 16h              
+    mov ah, 1
+    int 21h              
                
     ret
 Loan_Duration endp           
