@@ -37,7 +37,10 @@
     YN db ?   
     col db 25h                      ;always point to no 
     num db ?                        ;row print                   
-    bool db ?                       ;no choice      
+    bool db ?                       ;no choice           
+    Loan dw ?
+    ;exp dw 10000, 1000, 100, 10, 1       
+    exp dw 1, 10, 100, 1000, 10000
     
     ;INTEREST-TABLE-----------------------------
     int_Table1 db "Interest Rate & Loan Duration$"
@@ -270,13 +273,13 @@ D_RESET:
     
     
                                                                    
-LOAN:                   ;you can move this to your function   
+Loan_Function:                   ;you can move this to your function   
     call Loan_Amount
     jmp MENU_SCR   
    
 EN1:
     cmp row, 0Eh
-    je LOAN
+    je Loan_Function
     ;cmp row, 0Fh         to be added more menu selection
     ret            
 _menu endp      
@@ -286,7 +289,7 @@ _menu endp
             
             
             
-            
+           
             
             
 Loan_Amount proc
@@ -366,7 +369,7 @@ Loan_Amount endp
 
 Loan_Input proc
     mov cx, 5
-    mov si, 0        
+    mov si, 0                         
     mov num, 28h    ;print moves forward
 L4:               
     mov dx, 0E28h   ;fixed col : 26h 
@@ -390,7 +393,7 @@ L4:
 	 	
 	dec num	         ;left each time
 	
-	lea dx, cash         ;not more than 15000
+	lea dx, cash         ;00001 00021 00321
 	call print
 	    	
 	cmp cl, 1
@@ -402,32 +405,44 @@ R1:
 	mov bool, 0                       
 skip1:
 	  
-	ret 
-      
-;Constraints----------------          
+	ret                              
         
-LIMIT:   
-    cmp cash[0], 1
-    jbe R2    
-    cmp cash[1], 5
-    jbe R2
-
-    mov cx, 3                                                     ;<------------------fix this
-    mov si, 2
-L6:        
-    mov al, cash[si]
-    cmp al, maxloan[si]         ;compare 15000
-    ja L_error                     ;reset     
+LIMIT:                
+    mov cx, 5 
+    mov si, 5
+    mov di, 0    
     
-    inc si
-    loop L6                                         
+DecHex:       
+    xor ax, ax 
+    mov al, cash[si-1]
+    cmp al, 20h
+    je ignore
+    
+    sub al, 30h
+    mul exp[di]                     ;16^0
+    
+    add Loan, ax   
+               
+ignore:
+    dec si     
+    add di, 2             
+               
+    loop DecHex   
+                  
+    mov bx, Loan              
+    cmp bx, 3A98h           ;max loan 15000
+    ja L_error          
+    cmp bx, 03E8h           ;min loan 1000
+    jb L_error                  
     
 R2:                                    ;resume loop 
     mov cx, 1 
     jmp R1	      
     
 L_error:            
-    call Loan_error         ;Get error msg and clear content    
+    call Loan_error         ;Get error msg and clear content   
+    xor ax, ax
+    mov Loan, ax 
     mov bool, 1
     jmp skip1
     
@@ -435,14 +450,14 @@ Loan_Input endp
 
 
 
-Loan_Confirmation proc     ;THIS FUNCTION FOR YES AND NO
+Loan_Confirmation proc     
     
     jmp L_GOTO                                      
     
 ;---------------------------------------------------    
     
-L_right:                  ;NO DECISION
-    mov dx, 141Fh          ;print yes coord - 1
+L_right:                  ;NO 
+    mov dx, 141Fh          ;cursor - 1
     call cursor 
 
     mov bx, 000Ah
@@ -501,7 +516,13 @@ L_condition:                    ;HERE IS FUNCTION
 L_end:                  ;return brings the content of column    left and right  
     
     ret
-Loan_Confirmation endp                   
+Loan_Confirmation endp    
+
+
+
+
+
+
     
 Confirmation proc           ;print Confirm     
     mov dx, 1122h
