@@ -161,7 +161,7 @@ _POWLOOP PROC
  MOV AX, constantVar
  MOV fPoint, AX  
  
- BIGASSLOOP:
+ BIGLOOP:
 
  XOR BX, BX
  XOR DX, DX
@@ -222,7 +222,7 @@ _POWLOOP PROC
  
  
  roundNone:
- LOOP BIGASSLOOP
+ LOOP BIGLOOP
  
  
  XOR AX, AX
