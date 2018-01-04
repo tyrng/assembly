@@ -9,7 +9,7 @@
     
     loginstr db "Enter pass code $"                       
     password db "eeyore"              
-    errorstr db "Pass code doesn't match!$"      
+    errorstr db "* Pass code doesn't match!$"      
     buffer db 15 dup ("$")
 
     ;MENU ---------------------------
@@ -24,11 +24,11 @@
 	
 	;LOAN-------------------------------   
 	LoanTitle db "Enter loan amount (1,000 USD - 15,000 USD) $"  
-    errStr db "Invalid Input! Did you enter integers?$"   
+    errStr db "Invalid! Check your Input$"   
     maxloan db "15000"              
     minloan db "01000"                      ;<---min loan do this
     decStr db "Confirm Amount? $"  
-    contStr db "   Continue ?$"       
+    contStr db "Continue Progress?$"       
     redoStr db "Retry enter Year? $"                        
     yes db "Yes$"
     no db "No$"      
@@ -40,24 +40,26 @@
     num db ?                        ;row print                   
     bool db ?                       ;no choice           
     inputVar dw ? 
-    exp dw 1, 10, 100, 1000, 10000
+    exp dw 1, 10, 100, 1000, 10000        
     
     ;INTEREST-TABLE-----------------------------
     int_Table1 db "Interest Rate & Loan Duration$"
-    int_Table2 db "Loan Duration     1-3 years       4-6years        7-10 years$"
+    int_Table2 db "Loan Duration     1-3 years       4-6 years        7-10 years$"
     int_Table3 db "Interest Rate     30%             18%             12%$"
     intStr db "Loan Amount Selected: (USD) $" ;cash here
-    intDur db "Enter Loan Duration: $"
+    intDur db "Enter Loan Duration : $"  
+    yearError db "Please enter year between 0 - 10$"
                                                                
     Year Label Byte
-    xmax db 3
-    xact db ?
-    Duration db 3 dup (?)      
-    R db 0        
+    max2 db 3
+    act2 db ?
+    Duration db 3 dup (?)                            
+    bytes db 10, 1
+    
     ;FORMULA-------------------------------------
     formula1 db "Total Compounded Loan = P x (1 + R / N)^(N x T)$" 
     formula2 db "Monthly Loan Payment  = (P x R / N) / (1 - (1 + R / N)^(-N x T)$"
-    equalStr db "= (USD) $"       
+    equalStr db "= (USD)   $"       
     
     ;RECEIPT--------------------------------------
     recStr db "Loan History$"  
@@ -133,8 +135,7 @@ EXIT:
 main endp  
 
 cls proc
-    mov ah, 6
-    xor al, al
+    mov ax, 0600h
     xor cx, cx
     mov dx, 184Fh       ;end coord
     mov bh, 0Ah         ;cyan bg, green text
@@ -189,9 +190,8 @@ L7:
     ret      
                     
 _login proc     
-L1:                                    ;,------------------ add err msg and ****
-    call clstr
     call cls 
+L1:                                    ;,------------------ add err msg and ****
     call ctscr  
                                      
     xor dx, dx                         
@@ -201,7 +201,7 @@ L1:                                    ;,------------------ add err msg and ****
     mov dx, 0E1Dh
     call cursor
     
-    mov bx, 00A0h     
+    mov bx, 00AAh   ;A0h     
     mov cx, 0017
     call color  
     
@@ -218,16 +218,32 @@ L1:                                    ;,------------------ add err msg and ****
 L2:
     mov bl, password[si]
     cmp pass[si], bl
-    jne L1  
+    jne invalid  
     
     inc si       
-    loop L2    
+    loop L2      
+     
+    ret   
     
-    ret     
+invalid:    
+    mov dx, 1019h
+    call cursor
+    
+    mov bx, 000Ch     
+    mov cx, 0026
+    call color  
+    
+    lea dx, errorstr
+    call print  
+    
+    call clstr       
+                  
+    jmp L1
+_login endp    
             
 _menu proc     
     
-MENU_SCR:          
+menu_scr:          
     call cls
     call ctscr                  
     
@@ -286,9 +302,9 @@ B1:
     loop L3  
       
     
-UP:           
+UP:                 
     mov bx, 000Ah      ;set color back to normal 
-    mov cx, 0017
+    mov cx, 0018
     call color
     
     dec row        
@@ -336,24 +352,23 @@ D_BACK:
           
 D_RESET:
     sub row, 3         ;go back to top
-    jmp D_BACK                         
-    
-    
-    
+    jmp D_BACK                             
                                                                    
 Loan_Function:                   ;you can move this to your function   
     call Loan_Amount
-    jmp MENU_SCR   
+    jmp menu_scr   
     
 Receipt_Function:
     call Receipt
-    jmp MENU_SCR    
+    jmp menu_scr    
    
 EN1:
     cmp row, 0Eh
     je Loan_Function
     cmp row, 0Fh         ;to be added more menu selection
-    je Receipt_Function
+    je Receipt_Function 
+    
+    call cls
     ret            
 _menu endp      
 
@@ -425,10 +440,10 @@ LoanDuration:                     ;redo if wrong input
     cmp col, 20h            ;YES = go to jon's calculation  
     je LoanComputation
     
-    mov dx, 1121h       ;fixed 22
+    mov dx, 111Fh       ;1F
     call cursor                                
     
-    mov bx, 04h           ;Change this color when you change background     
+    mov bx, 0Ch           ;Change this color when you change background     
     mov cx, 20
     call color  
                                 
@@ -462,15 +477,15 @@ Loan_Amount endp
 
 Loan_Input proc   
     xor ax, ax
-    mov inputVar, ax
+    mov inputVar, ax  
     
     mov cx, 5
     mov si, 0                         
     mov num, 28h    ;print moves forward
 L4:               
-    mov dx, 0E28h   ;fixed col : 26h 
+    mov dx, 0A28h   ;fixed col : 26h 
     call cursor  
-	
+
     mov ah, 1
     int 21h     
                 
@@ -483,7 +498,7 @@ L4:
                            
     mov tempStr[si], al  
     
-    mov dh, 0Eh
+    mov dh, 0Ah
     mov dl, num
 	call cursor  
 	 	
@@ -610,13 +625,13 @@ Loan_Confirmation endp
 
 
 Loan_Start proc
-    mov dx, 0C16h       ;about top center       ;if jump range issue send this to new function
+    mov dx, 0916h       ;about top center       ;if jump range issue send this to new function
     call cursor      
                                 
     lea dx, LoanTitle     
     call print                    
     
-    mov dx, 0E24h       ;24 as center   #fixed
+    mov dx, 0A24h       ;24 as center   #fixed
     call cursor
     
     lea dx, zero    ;00000
@@ -639,7 +654,7 @@ Confirmation proc           ;print Confirm
     
 
 Continue proc                   ;print continue 
-    mov dx, 1120h               ;print below 
+    mov dx, 111Eh               ;print below 
     call cursor
     
     mov bx, 0Ch           ;Change this color when you change background     
@@ -653,7 +668,7 @@ Continue proc                   ;print continue
                            
 
 Loan_error proc
-    mov dx, 101Eh               ;error display
+    mov dx, 0E1Bh               ;error display
     call cursor
  
     lea dx, errStr              
@@ -685,67 +700,74 @@ Loan_condition proc             ;THIS PRINTS YES AND NO
 Loan_Duration proc 
     call cls     
     
-    mov dx, 0909h
+    mov dx, 031Bh       ;cursor
     call cursor
     
-    lea dx, int_Table1
-    call print        
-               
-    mov dx, 0A09h                     ;9h col 
-    call cursor                         
+    lea dx, int_Table1              
+    call print 
+    
+    mov dx, 060Bh       ;cursor
+    call cursor
     
     lea dx, int_Table2
-    call print    
-    
-    mov dx, 0B09h                     
+    call print 
+ 
+    mov dx, 070Bh       ;cursor      
     call cursor
     
     lea dx, int_Table3
-    call print    
+    call print  
     
-    mov dx, 0C09h                     
+    mov dx, 0912h       ;cursor
     call cursor
     
     lea dx, intStr
-    call print          
+    call print     
     
-    lea dx, tempStr    
-    call print    
+    mov bx, 000Eh           ;Yellow     
+    mov cx, 0010
+    call color  
+
+    lea dx, tempStr
+    call print     
     
-    mov dx, 0D09h                     
+    mov dx, 0B12h                     
     call cursor
     
     lea dx, intDur
-    call print
+    call print     
+    
+    mov bx, 000Eh           ;Yello     
+    mov cx, 0005
+    call color  
                
     mov ah, 0Ah
     lea dx, Year
     int 21h      
     
     xor ax, ax
+    xor bx, bx              
                                  
-;    mov bl, 0Ah                                
-;    mov al, Duration[0]               
-;    sub al, 30h
-;    div bl      
-;    mov R, ah
-;    mov al, R                
-;    mul bl             
-;    mov bl, Duration[1]
-;    sub bl, 30h
-;    add al, bl
-;                              
-
-
-    cmp al, 1
-    jb L_Duration
-    cmp al, 0Ah
-    ja L_Duration         
-                              
-    mov tVar, al              ;; jump to err <-----------------------------------------------------------------------------------eqjfewweuf 
+    mov cl, act2
+    mov si, cx
+digits:
+    mov al, Duration[si-1]       
+    sub al, 30h 
     
-    xor ax, ax
-    set_rate:
+    mul bytes[si-1]
+    add bl, al
+
+    dec si
+    loop digits    
+  
+    cmp bl, 1
+    jb LimitOver
+    cmp bl, 0Ah
+    ja LimitOver         
+                              
+    mov tVar, bl              ;; jump to err <-----------------------------------------------------------------------------------eqjfewweuf 
+                
+    xor bx, bx 
         cmp tVar,3
         jbe rate1
         cmp tVar,6
@@ -757,47 +779,36 @@ Loan_Duration proc
         mov bx, interestRates[4]    ;1025
         jmp Here
         rate2: 
-        mov bx, interestRates[2]    ;1015
+        mov bx, interestRates[2]    ;1015    
 Here:                               
         mov constantVar, bx 
                  
 L_Duration:               
-    ret 
+    ret                             ;return here
+                                   
+LimitOver:    
+    mov dx, 1121h         
+    call cursor                                
+    
+    mov bx, 0Ch           ; light red     
+    mov cx, 20
+    call color  
+    
+    lea dx, yearError
+    call Continue
+    jmp L_Duration    
 
 Loan_Duration endp  
 
-FormulaPrt proc
-    call cls           
-    
-    mov dx, 071Bh       ;cursor
-    call cursor
-    
-    lea dx, int_Table1              
-    call print 
-    
-    mov dx, 0A0Bh       ;cursor
-    call cursor
-    
-    lea dx, int_Table2
-    call print 
- 
-    mov dx, 0B0Bh       ;cursor      
-    call cursor
-    
-    lea dx, int_Table3
-    call print  
-    
-    mov dx, 0F12h       ;cursor
-    call cursor
-    
-    lea dx, intStr
-    call print  
-
-    lea dx, tempStr
-    call print     
+FormulaPrt proc    
+    mov ax, 0600h       ;clear screen
+    xor cx, 1100h       ;start coord
+    mov dx, 184Fh       ;end coord
+    mov bh, 0Ch         ;back bg, green text
+    int 10h    
     
     ;Total           
-    mov dx, 120Bh       ;cursor
+    mov dx, 0F0Bh       ;cursor
     call cursor
     
     lea dx, formula1                
@@ -807,7 +818,7 @@ FormulaPrt proc
     call _CONST_SETTING
     call _FINALOAN 
     
-    mov dx, 1321h       ;cursor
+    mov dx, 1021h       ;cursor
     call cursor             
     
     lea dx, equalStr
@@ -816,7 +827,7 @@ FormulaPrt proc
     call _VARSTRING
                     
     ;Monthly Payment  
-    mov dx, 150Bh       ;cursor
+    mov dx, 120Bh       ;cursor
     call cursor
     
     lea dx, formula2
@@ -825,7 +836,7 @@ FormulaPrt proc
     ;WORKING   
     call _MONTHLY_LOAN  
     
-    mov dx, 1621h       ;cursor
+    mov dx, 1321h       ;cursor
     call cursor 
     
     lea dx, equalStr
