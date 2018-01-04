@@ -33,13 +33,12 @@
     no db "No$"      
     zero db 5 dup (30h), "$"
     
-    cash db 5 dup (20h), "$" 
+    tempStr db 5 dup (20h), "$" 
     YN db ?   
     col db 25h                      ;always point to no 
     num db ?                        ;row print                   
     bool db ?                       ;no choice           
-    Loan dw ?
-    ;exp dw 10000, 1000, 100, 10, 1       
+    inputVar dw ? 
     exp dw 1, 10, 100, 1000, 10000
     
     ;INTEREST-TABLE-----------------------------
@@ -116,7 +115,7 @@ clstr proc
  
 clbyte proc
 L7:     
-    mov cash[si], 20h         ;clear input
+    mov tempStr[si], 20h         ;clear input
     inc si
         
     loop L7  
@@ -327,7 +326,7 @@ LoanDuration:                     ;redo if wrong input
     call Confirmation
     call Loan_Confirmation  ;YES / NO     
     
-    cmp col, 1Eh            ;YES = go to jon's calculation 
+    cmp col, 20h            ;YES = go to jon's calculation 
     ;je JON'S CALCULATION                                           <---- take cash variable to tyrone conversion
     mov dx, 1122h       ;fixed 22
     call cursor                                
@@ -341,7 +340,7 @@ LoanDuration:                     ;redo if wrong input
                        
     call Loan_Confirmation
     
-    cmp col, 1Eh            ;RETRY? YES = go back loanduration              
+    cmp col, 20h            ;RETRY? YES = go back loanduration              
     je LoanDuration
     
     jmp L_choice
@@ -350,14 +349,14 @@ L_enter:                    ;successfully entered loan amount
     call Confirmation    
     call Loan_Confirmation   
        
-    cmp col, 1Eh            ;YES
+    cmp col, 20h            ;YES
     je LoanDuration                                                                      
 
 L_choice:    
     call Continue           ;Continue?   
     call Loan_Confirmation  ;YES / NO     
     
-    cmp col, 1Eh            ;1Eh = YES                   
+    cmp col, 20h            ;1Eh = YES                   
     je L_restart
                                                 
     ret
@@ -379,13 +378,13 @@ L4:
     int 21h     
                 
     cmp al, 0Dh           ;end input
-    je L_enter    
+    je LIMIT    
     cmp al, 30h
     jb L_error
     cmp al, 39h
     ja L_error    
                            
-    mov cash[si], al  
+    mov tempStr[si], al  
     
     mov dh, 0Eh
     mov dl, num
@@ -393,11 +392,9 @@ L4:
 	 	
 	dec num	         ;left each time
 	
-	lea dx, cash         ;00001 00021 00321
+	lea dx, tempStr         ;00001 00021 00321
 	call print
-	    	
-	cmp cl, 1
-    je LIMIT                                      
+	                                             
 R1:	
 	inc si   	
 	loop L4 	
@@ -414,22 +411,21 @@ LIMIT:
     
 DecHex:       
     xor ax, ax 
-    mov al, cash[si-1]
+    mov al, tempStr[si-1]
     cmp al, 20h
     je ignore
     
     sub al, 30h
     mul exp[di]                     ;16^0
     
-    add Loan, ax   
-               
+    add inputVar, ax      
+    add di, 2 
 ignore:
-    dec si     
-    add di, 2             
+    dec si                
                
     loop DecHex   
                   
-    mov bx, Loan              
+    mov bx, inputVar              
     cmp bx, 3A98h           ;max loan 15000
     ja L_error          
     cmp bx, 03E8h           ;min loan 1000
@@ -437,12 +433,12 @@ ignore:
     
 R2:                                    ;resume loop 
     mov cx, 1 
-    jmp R1	      
+    jmp R1                              ;R = resume	      
     
 L_error:            
     call Loan_error         ;Get error msg and clear content   
     xor ax, ax
-    mov Loan, ax 
+    mov inputVar, ax 
     mov bool, 1
     jmp skip1
     
@@ -465,10 +461,10 @@ L_right:                  ;NO
     call color  
     
 L_GOTO:                  ;start coordinate first option
-    mov dx,1425h
+    mov dx,142Ah
     call cursor    
        
-    mov col, 25h       ;25 indicates NO (right)
+    mov col, 2Bh       ;25 indicates NO (right)
     
     mov bx, 00A0h      ;adjust coord
     mov cx, 4
@@ -477,7 +473,7 @@ L_GOTO:                  ;start coordinate first option
     jmp L_condition                                
     
 L_left:                 ;YES DECISION 
-    mov dx, 1425h
+    mov dx, 142Ah
     call cursor
 
     mov bx, 000Ah      ;point to first option
@@ -487,7 +483,7 @@ L_left:                 ;YES DECISION
     mov dx, 141Fh
     call cursor 
     
-    mov col, 1Eh        ;1E indicates YES (left)
+    mov col, 20h        ;1E indicates YES (left)
     
     mov bx, 00A0h  
     mov cx, 5
@@ -561,7 +557,7 @@ Loan_error proc
               
     mov cx, 5           
     xor si, si
-    lea bx, cash         
+    lea bx, tempStr         
     call clbyte                 ;clear byte          
     
     ret
@@ -573,7 +569,7 @@ Loan_condition proc             ;THIS PRINTS YES AND NO
     lea dx, yes
     call print 
     
-    mov dx, 1426h
+    mov dx, 142Bh
     call cursor
     
     lea dx, no
@@ -609,7 +605,7 @@ Loan_Duration proc
     lea dx, intStr
     call print          
     
-    lea dx, cash    
+    lea dx, tempStr    
     call print    
     
     mov dx, 0D09h                     
