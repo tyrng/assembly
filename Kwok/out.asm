@@ -69,7 +69,7 @@
                                                        
     fTitle db "List of Loan Issued$"                                                     
     scanf db 1000 dup ("$")                                             
-    counter db 31h                ;read count from file     
+    count db 31h                ;read count from file     
     tab db 09h                  ; do count file         
     nl db 13, 10                           
     
@@ -451,8 +451,6 @@ Receipt proc
 Receipt endp                   
               
 GenerateFile proc
-    ; READ COUNTER FROM FILE
-
     ; MOV THIS WRITE FILE FUNCTION TO OTHER PLACE
     mov ah, 3Dh    
     mov al, 1       ;write file
@@ -472,7 +470,9 @@ GenerateFile proc
     mov bx, handle     
     lea dx, counter  ; Write Hour into file
 	mov cl, 1 
-    int 21h     
+    int 21h  
+    
+    inc counter   
     	
     mov ah, 40h         
     mov bx, handle    
