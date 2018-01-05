@@ -55,7 +55,7 @@
     max2 db 3
     act2 db ?
     Duration db 3 dup (?)                            
-    bytes db 10, 1
+    bytes db 1, 10
     
     ;FORMULA-------------------------------------
     formula1 db "Total Compounded Loan = P x (1 + R / N)^(N x T)$" 
@@ -306,7 +306,7 @@ L1:
     int 21h      
              
     xor cx, cx
-    mov cx, 3       ;length, change this when you change password 
+    mov cx, 6       ;length, change this when you change password 
     mov si, 0          
 L2:
     mov bl, password[si]
@@ -630,23 +630,18 @@ L_restart:          ;press no to go her
     jmp L_choice                 
     
 LoanComputation:  
-    call FormulaPrt
-    
+    call FormulaPrt      
+
     jmp L_choice
 
-LoanDuration:                     ;redo if wrong input    
+LoanDuration: 
+                          ;redo if wrong input    
     call Loan_Duration      
-                                       
-    call Confirmation
-    call PrintConfirmation  ;YES / NO     
-    
-    cmp col, 20h            ;YES = go to jon's calculation  
-    je LoanComputation
     
     mov dx, 111Fh       ;1F
     call cursor                                
     
-    mov bx, 0Ch           ;Change this color when you change background     
+    mov bx, 0Bh           ;Change this color when you change background     
     mov cx, 20
     call color  
                                 
@@ -656,9 +651,10 @@ LoanDuration:                     ;redo if wrong input
     call PrintConfirmation
     
     cmp col, 20h            ;RETRY? YES = go back loanduration              
-    je LoanDuration
+    je LoanDuration       
+    call GenerateFile       ;append loan into file
     
-    jmp L_choice
+    jmp L_choice     
 
 L_enter:                    ;successfully entered loan amount
     call Confirmation    
@@ -873,9 +869,59 @@ Loan_condition proc             ;THIS PRINTS YES AND NO
 
 ;------------------------------------------------------
 ;---------------------------LOAN DURATION DISPLAY TABLE
-Loan_Duration proc 
+Loan_Duration proc      
     call cls     
     
+    call Loan_TablePrt               
+                                 
+    mov cl, act2
+    mov si, cx   
+    mov di, 0
+digits:
+    mov al, Duration[si-1]       
+    sub al, 30h 
+    
+    mul bytes[di]
+    add bl, al
+              
+    inc di             
+    dec si
+    loop digits    
+  
+    cmp bl, 1
+    jb LimitOver
+    cmp bl, 0Ah
+    ja LimitOver         
+                              
+    mov tVar, bl               
+                
+    call AssignVar 
+                                  
+    mov constantVar, bx  
+       
+    ;Correct path                                                   
+    call Confirmation       ;COnfirm
+    call PrintConfirmation  ;YES / NO     
+    
+    cmp col, 20h            ;YES = go to jon's calculation  
+    jne L_Duration  
+    call FormulaPrt
+                 
+L_Duration:               
+    ret                             ;return here
+                                   
+LimitOver:    
+    mov dx, 0F1Ah         
+    call cursor     
+        
+    lea dx, yearError 
+    call print   
+        
+    jmp L_Duration    
+
+Loan_Duration endp  
+
+Loan_TablePrt proc
     mov dx, 031Bh       ;cursor
     call cursor
     
@@ -911,7 +957,7 @@ Loan_Duration proc
     call cursor
     
     lea dx, intDur
-    call print     
+    call print   
     
     mov bx, 000Eh           ;Yello     
     mov cx, 0005
@@ -922,59 +968,28 @@ Loan_Duration proc
     int 21h      
     
     xor ax, ax
-    xor bx, bx              
-                                 
-    mov cl, act2
-    mov si, cx
-digits:
-    mov al, Duration[si-1]       
-    sub al, 30h 
-    
-    mul bytes[si-1]
-    add bl, al
+    xor bx, bx    
+               
+    ret                 
+Loan_TablePrt endp 
 
-    dec si
-    loop digits    
-  
-    cmp bl, 1
-    jb LimitOver
-    cmp bl, 0Ah
-    ja LimitOver         
-                              
-    mov tVar, bl               
-                
+AssignVar proc
     xor bx, bx 
-        cmp tVar,3
-        jbe rate1
-        cmp tVar,6
-        jbe rate2          
+    cmp tVar,3
+    jbe rate1
+    cmp tVar,6
+    jbe rate2          
         
-        mov bx, interestRates[0]    ;1010
-        jmp Here
-        rate1:
-        mov bx, interestRates[4]    ;1025
-        jmp Here
-        rate2: 
-        mov bx, interestRates[2]    ;1015    
-Here:                               
-        mov constantVar, bx 
-                 
-L_Duration:               
-    ret                             ;return here
-                                   
-LimitOver:    
-    mov dx, 1121h         
-    call cursor                                
-    
-    mov bx, 0Ch           ; light red     
-    mov cx, 20
-    call color  
-    
-    lea dx, yearError
-    call Continue
-    jmp L_Duration    
-
-Loan_Duration endp  
+    mov bx, interestRates[0]    ;1010
+    jmp Here
+    rate1:
+    mov bx, interestRates[4]    ;1025
+    jmp Here
+    rate2: 
+    mov bx, interestRates[2]    ;1015 
+Here:                        
+    ret             
+AssignVar endp    
                         
 ;------------------------------------------------------
 ;-----------------------------------DISPLAY CALCULATION
@@ -1031,8 +1046,7 @@ FormulaPrt proc
     xor cx, cx
     mov dx, 184Fh   ;24 : 79
     int 10h     
-    
-    call GenerateFile       ;append loan into file
+
                                          
     ret
                
