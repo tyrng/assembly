@@ -8,7 +8,7 @@
     pass db 15 dup("$")   
     
     loginstr db "Enter pass code $"                       
-    password db "eeyore"              
+    password db "123"              
     errorstr db "* Pass code doesn't match!$"      
     buffer db 15 dup ("$")
 
@@ -16,7 +16,8 @@
     menu db "Bank Loan Machine$"
     menu1 db "1. Loan$"     
     menu2 db "2. Receipt$"
-    menu3 db "3. Exit Program$"  
+    menu3 db "3. Exit Program$"      
+    EndStr db "Thank You$"      ;Shut down Message
        
 	arrow db ?          ;this stores input of arrow  
 	enter db ?          ;this stores input of enter 	                          
@@ -27,7 +28,7 @@
     errStr db "Invalid! Check your Input$"   
     maxloan db "15000"              
     minloan db "01000"                      ;<---min loan do this
-    decStr db "Confirm Amount? $"  
+    decStr db "  Confirm Amount? $"  
     contStr db "Continue Progress?$"       
     redoStr db "Retry enter Year? $"                        
     yes db "Yes$"
@@ -46,8 +47,8 @@
     int_Table1 db "Interest Rate & Loan Duration$"
     int_Table2 db "Loan Duration     1-3 years       4-6 years        7-10 years$"
     int_Table3 db "Interest Rate     30%             18%             12%$"
-    intStr db "Loan Amount Selected: (USD) $" ;cash here
-    intDur db "Enter Loan Duration : $"  
+    intStr db "Loan Amount Selected: (USD) $" 
+    intDur db "Enter Loan Duration (Year): $"  
     yearError db "Please enter year between 0 - 10$"
                                                                
     Year Label Byte
@@ -61,64 +62,74 @@
     formula2 db "Monthly Loan Payment  = (P x R / N) / (1 - (1 + R / N)^(-N x T)$"
     equalStr db "= (USD)   $"       
     
-    ;RECEIPT--------------------------------------
-    recStr db "Loan History$"  
-    History db "history.txt"
-    ;FNAME db "REC1.txt"
-    handle dw ?
+    ;RECEIPT--------------------------------------   
+    FNAME db "2.txt",0    ;FILE NAME 
+    handle dw ?                       
+    ScanLength db 27          ;scan byte, start with 
+                                                       
+    fTitle db "List of Loan Issued$"                                                     
+    scanf db 1000 dup ("$")                                             
+    counter db 31h                ;read count from file     
+    tab db 09h                  ; do count file         
+    nl db 13, 10                           
     
+    ;TIME-----------------------------------------
+    TimeSep db ":"  
+    Hours dw ?
+    Minutes dw ?              
+   
 ;-------------------------------------------------------------------------------------------
-tens DW 10000,1000,100,10,1
-;inputVar DW ?	;Loan Amount (Decimal Form)
-outputVar DW ?
-StringOutput DB 30H,30H,30H,30H,30H
-;------------------------------------
-
-;---CONSTANT INTEREST RATES ARRAY---
-interestRates DW 1010, 1015, 1025	;12%, 18%, 30%
-
-
-;---Number of years the loan is borrowed for
-tVar DB 2
-
-;---Number of times the interest is compounded annually
-nVar DB 12
-                                                        
-;---(N x T) variable
-ntVar DB ?
-
-;---(1 + R/N) CONSTANT variable----
-constantVar DW 1025
-cString DW ?,?,?,?
-
-;---Floating point variables
-fPoint DW ?
-fpString DW ?,?,?,?
-
-;---Total compounded loan variables
-totalLoan DW 0
-decimalPoint DW 0
-dpString DB 30H, 30H
-tempDP DW ?
-
-
-;---Power steps for floating point 
-powSteps DW 4 dup (?)
-powDivisor DW 100, 10, 1
-
-;---Dramatic text effect 
-looper DB 2
-
-
-;========MONTHLY LOAN PAYMENT VARIABLES==========
-loanXinterest DW ?
-loanDP DW ?
-
-d_loopVar DW ?
-denomVar DW ?
-	
-mLoanPayment DW ?
-mLoanPayment_DP DW ?
+    tens DW 10000,1000,100,10,1
+    ;inputVar DW ?	;Loan Amount (Decimal Form)
+    outputVar DW ?
+    StringOutput DB 30H,30H,30H,30H,30H
+    ;------------------------------------
+    
+    ;---CONSTANT INTEREST RATES ARRAY---
+    interestRates DW 1010, 1015, 1025	;12%, 18%, 30%
+    
+    
+    ;---Number of years the loan is borrowed for
+    tVar DB 2
+    
+    ;---Number of times the interest is compounded annually
+    nVar DB 12
+                                                            
+    ;---(N x T) variable
+    ntVar DB ?
+    
+    ;---(1 + R/N) CONSTANT variable----
+    constantVar DW 1025
+    cString DW ?,?,?,?
+    
+    ;---Floating point variables
+    fPoint DW ?
+    fpString DW ?,?,?,?
+    
+    ;---Total compounded loan variables
+    totalLoan DW 0
+    decimalPoint DW 0
+    dpString DB 30H, 30H
+    tempDP DW ?
+    
+    
+    ;---Power steps for floating point 
+    powSteps DW 4 dup (?)
+    powDivisor DW 100, 10, 1
+    
+    ;---Dramatic text effect 
+    looper DB 2
+    
+    
+    ;========MONTHLY LOAN PAYMENT VARIABLES==========
+    loanXinterest DW ?
+    loanDP DW ?
+    
+    d_loopVar DW ?
+    denomVar DW ?
+    	
+    mLoanPayment DW ?
+    mLoanPayment_DP DW ?
 ;---------------------------------------------------------------      
 	                               	                               
 .code
@@ -129,11 +140,17 @@ main proc
     call _login                     
     call _menu     
  
-EXIT:                
+EXIT:   
+    call ctscr       
+    lea dx, EndStr
+    call print   
+      
     mov ah, 4ch
     int 21h                     
 main endp  
 
+;------------------------------------------------------
+;--------------------------Simple Functions (most used)
 cls proc
     mov ax, 0600h
     xor cx, cx
@@ -146,22 +163,19 @@ cls proc
 print proc  
     mov ah, 9
     int 21h    
-    xor dx,dx
-        
+    xor dx,dx       
     ret                   
              
 color proc
     mov ax, 0920h       ;color focus      
     mov dl, 20h         ;col : 24d
-    int 10h 
-    
+    int 10h    
     ret
 
 cursor proc    
     mov ah, 2           ;next cursor
     mov bh, 0  
-    int 10h
-    
+    int 10h    
     ret    
     
 ctscr proc
@@ -169,7 +183,6 @@ ctscr proc
     mov bh, 0           ;page 0
     mov dx, 0C1Eh       ;center
     int 10h
- 
     ret       
                 
 clstr proc 
@@ -177,21 +190,47 @@ clstr proc
     lea si, pass
     lea di, buffer
     mov cl, max
-    rep movsb
-    
+    rep movsb 
     ret      
  
 clbyte proc
 L7:     
     mov tempStr[si], 20h         ;clear input
     inc si       
-    loop L7  
+    loop L7    
+    ret     
     
-    ret      
-                    
+Confirmation proc           ;a Confirm message    
+    mov dx, 111Eh
+    call cursor                                
+    
+    mov bx, 0Ch           ;Change this color when you change background     
+    mov cx, 20
+    call color  
+    
+    lea dx, decStr          ;Confirm Input?
+    call print     
+    
+    ret
+ 
+Continue proc                   ;print continue 
+    mov dx, 111Eh               ;print below 
+    call cursor
+    
+    mov bx, 0Ch           ;Change this color when you change background     
+    mov cx, 20
+    call color 
+    
+    lea dx, contStr             ;continue?
+    call print  
+                           
+    ret     
+
+;------------------------------------------------------
+;------------------------------------------LOGIN SCREEN                    
 _login proc     
     call cls 
-L1:                                    ;,------------------ add err msg and ****
+L1:                                    
     call ctscr  
                                      
     xor dx, dx                         
@@ -213,7 +252,7 @@ L1:                                    ;,------------------ add err msg and ****
     int 21h      
              
     xor cx, cx
-    mov cx, 6       ;change this as well when you change password 
+    mov cx, 3       ;length, change this when you change password 
     mov si, 0          
 L2:
     mov bl, password[si]
@@ -239,8 +278,9 @@ invalid:
     call clstr       
                   
     jmp L1
-_login endp    
-            
+_login endp 
+;------------------------------------------------------
+;-------------------------------------------MENU SCREEN            
 _menu proc     
     
 menu_scr:          
@@ -299,8 +339,7 @@ L3:
     cmp al, 0Dh         ;enter key 0dh
     je EN1           
 B1:                                                               
-    loop L3  
-      
+    loop L3        
     
 UP:                 
     mov bx, 000Ah      ;set color back to normal 
@@ -365,49 +404,160 @@ Receipt_Function:
 EN1:
     cmp row, 0Eh
     je Loan_Function
-    cmp row, 0Fh         ;to be added more menu selection
-    je Receipt_Function 
+    cmp row, 0Fh         
+    je Receipt_Function
     
     call cls
-    ret            
+    ret                  ;Option 3 is to terminate prog
 _menu endp      
 
+;------------------------------------------------------
+;------------------------------------------RECEIPT PAGE
 Receipt proc
-    call cls
+    call cls      
+    mov dx, 051Eh
+    call cursor
     
-    lea dx, recStr 
+    lea dx, fTitle
+    call print       
+    
+    mov dx, 0700h
+    call cursor
+  
+    mov ah, 3Dh
+    mov al, 0       ;read
+    lea dx, Fname        
+    int 21h
+    
+    mov handle, ax
+    
+    mov ah, 3Fh
+    mov bx, handle
+    mov cl, ScanLength       ;+13 in total
+    lea dx, Scanf
+    int 21h
+    
+    lea dx, Scanf
     call print
-
-;	mov ah, 3Dh 	;open existing file
-;	mov al, 1   	;0 - read, 1 - write, 2 - read&write 
-;	lea dx, history	; ASCIIZ filename to open
-;	int 21h
-;
-;	mov handle, ax	;handle or err code3
-;
-;	mov ah, 42h
-;	mov bx, handle	;move file ptr
-;	xor cx, cx
-;	xor dx, dx
-;	mov al, 02h
-;	int 21h
-;
-;	mov ah, 40h	    ; write file
-;	mov bx, handle	; file handle for screen
-;	mov cl, 5	; len of message (bytes)
-;	lea dx, MSG	; copy address to DX
-;	int 21h		; display MSG executed 	
-;
-;	;append function
-;	mov ah, 40h	; write file
-;	mov bx, handle	; file handle for screen
-;	mov cl, 2	; len of message (bytes)
-;	lea dx, nl	; copy address to DX
-;	int 21h		; display MSG executed
-;                  
+    
+    mov ah, 3Eh      ; close file
+    mov bx, handle
+    int 21h           
+    
+    mov ah, 0
+    int 16h
+                  
     ret        
-Receipt endp
-            
+Receipt endp                   
+              
+GenerateFile proc
+    ; READ COUNTER FROM FILE
+
+    ; MOV THIS WRITE FILE FUNCTION TO OTHER PLACE
+    mov ah, 3Dh    
+    mov al, 1       ;write file
+    lea dx, Fname
+    int 21h
+    
+	mov handle, ax	;handle or err code3
+
+	mov ah, 42h
+	mov bx, handle	;move file ptr
+	xor cx, cx
+	xor dx, dx
+	mov al, 02h
+	int 21h            
+	;COUNTER======================================2 
+    mov ah, 40h        
+    mov bx, handle     
+    lea dx, counter  ; Write Hour into file
+	mov cl, 1 
+    int 21h     
+    	
+    mov ah, 40h         
+    mov bx, handle    
+	mov cl, 1       ; 09h
+	lea dx, tab
+    int 21h       	
+	;TIME=========================================5
+    mov ah, 2ch    ; Hour Part, To get System Time
+    int 21h
+    mov al, ch     ; Hour is in CH
+    AAM            ; ASCII Adjust after MUL
+    mov bx, ax          
+    add bx, 3030h  ; ASCII Adjustment 
+    
+    xchg bl, bh
+    
+    mov Hours, bx
+    
+    mov ah, 40h        
+    mov bx, handle     
+    lea dx, Hours  ; Write Hour into file
+	mov cx, 2 
+    int 21h      
+	
+    mov ah, 40h      
+    mov bx, handle                           
+    mov cl, 1
+	lea dx, TimeSep ; Hour : Minute  
+    int 21h     
+                   
+    mov ah, 2ch    ; Minutes Part
+    int 21h
+    mov al, cl
+    AAM
+    mov bx, ax     ; Minutes is in CL  
+    add bx, 3030h 
+    
+    xchg bl, bh   
+     
+    mov Minutes, bx
+    
+    mov ah, 40h        
+    mov bx, handle     
+    lea dx, Minutes  ; Write Hour into file
+	mov cx, 2 
+    int 21h      
+       
+	
+	;LOAN==========================================9
+    mov ah, 40h         
+    mov bx, handle    
+	mov cl, 1       ; 09h
+	lea dx, tab
+    int 21h         
+
+    mov ah, 40h        
+    mov bx, handle    
+	mov cl, 1       ; 09h
+	lea dx, tab
+    int 21h       
+                              
+    mov ah, 40h       
+    mov bx, handle    
+	mov cl, 5
+	lea dx, tempStr
+    int 21h                       
+
+    mov ah, 40h         ; write into file
+    mov bx, handle    
+    mov cl, 2	
+	lea dx, nl	;      END OF LINE
+    int 21h    	 
+
+	mov ah, 3Eh         ; close file function
+	mov bx, handle      ; copy handle to bx
+	int 21h             ; execute closing   
+	
+    ;update length to output string   
+    add ScanLength, 16      ;length to read characters
+	                      
+	ret
+GenerateFile endp  
+
+;------------------------------------------------------
+;-------------------------------------------LOAN AMOUNT
 Loan_Amount proc
 L_restart:          ;press no to go her   
     mov cx, 5       ;clear byte of cash if no
@@ -417,8 +567,7 @@ L_restart:          ;press no to go her
     call cls
     call ctscr           
                      
-    call Loan_Start                 
-;money-------------------------------------------------------                                         
+    call Loan_Start                                                        
     call Loan_Input   
      
     cmp bool, 0
@@ -435,7 +584,7 @@ LoanDuration:                     ;redo if wrong input
     call Loan_Duration      
                                        
     call Confirmation
-    call Loan_Confirmation  ;YES / NO     
+    call PrintConfirmation  ;YES / NO     
     
     cmp col, 20h            ;YES = go to jon's calculation  
     je LoanComputation
@@ -450,7 +599,7 @@ LoanDuration:                     ;redo if wrong input
     lea dx, redoStr
     call print
                        
-    call Loan_Confirmation
+    call PrintConfirmation
     
     cmp col, 20h            ;RETRY? YES = go back loanduration              
     je LoanDuration
@@ -459,14 +608,14 @@ LoanDuration:                     ;redo if wrong input
 
 L_enter:                    ;successfully entered loan amount
     call Confirmation    
-    call Loan_Confirmation   
+    call PrintConfirmation   
        
     cmp col, 20h            ;YES
     je LoanDuration                                                                      
 
 L_choice:    
     call Continue           ;Continue?   
-    call Loan_Confirmation  ;YES / NO     
+    call PrintConfirmation  ;YES / NO     
     
     cmp col, 20h            ;1Eh = YES                   
     je L_restart
@@ -474,7 +623,8 @@ L_choice:
     ret
 Loan_Amount endp    
 
-
+;------------------------------------------------------
+;----------------------------------------INPUT FOR LOAN
 Loan_Input proc   
     xor ax, ax
     mov inputVar, ax  
@@ -483,7 +633,7 @@ Loan_Input proc
     mov si, 0                         
     mov num, 28h    ;print moves forward
 L4:               
-    mov dx, 0A28h   ;fixed col : 26h 
+    mov dx, 0B28h   ;fixed col : 28h 
     call cursor  
 
     mov ah, 1
@@ -498,7 +648,7 @@ L4:
                            
     mov tempStr[si], al  
     
-    mov dh, 0Ah
+    mov dh, 0Bh
     mov dl, num
 	call cursor  
 	 	
@@ -553,13 +703,10 @@ L_error:
     
 Loan_Input endp    
 
-
-
-Loan_Confirmation proc     
-    
-    jmp L_GOTO                                      
-    
-;---------------------------------------------------    
+;------------------------------------------------------
+;------------------------------Confirmation to Proceed
+PrintConfirmation proc     
+    jmp L_GOTO
     
 L_right:                  ;NO 
     mov dx, 141Fh          ;cursor - 1
@@ -621,51 +768,25 @@ L_condition:                    ;HERE IS FUNCTION
 L_end:                  ;return brings the content of column    left and right  
     
     ret
-Loan_Confirmation endp    
+PrintConfirmation endp    
 
 
+;------------------------------------------------------
+;--------------------FUNCTION SEGMENTS (avoid jump error)
 Loan_Start proc
-    mov dx, 0916h       ;about top center       ;if jump range issue send this to new function
+    mov dx, 0916h       ;about top center  
     call cursor      
                                 
     lea dx, LoanTitle     
     call print                    
     
-    mov dx, 0A24h       ;24 as center   #fixed
+    mov dx, 0B24h       ;24 as center   #fixed
     call cursor
     
     lea dx, zero    ;00000
     call print
                         
-    ret                       
-    
-Confirmation proc           ;print Confirm     
-    mov dx, 1120h
-    call cursor                                
-    
-    mov bx, 0Ch           ;Change this color when you change background     
-    mov cx, 20
-    call color  
-    
-    lea dx, decStr          ;Confirm Input?
-    call print     
-    
-    ret
-    
-
-Continue proc                   ;print continue 
-    mov dx, 111Eh               ;print below 
-    call cursor
-    
-    mov bx, 0Ch           ;Change this color when you change background     
-    mov cx, 20
-    call color 
-    
-    lea dx, contStr             ;continue?
-    call print  
-                           
-    ret                       
-                           
+    ret                                 
 
 Loan_error proc
     mov dx, 0E1Bh               ;error display
@@ -696,7 +817,8 @@ Loan_condition proc             ;THIS PRINTS YES AND NO
     
     ret
 
-
+;------------------------------------------------------
+;---------------------------LOAN DURATION DISPLAY TABLE
 Loan_Duration proc 
     call cls     
     
@@ -765,7 +887,7 @@ digits:
     cmp bl, 0Ah
     ja LimitOver         
                               
-    mov tVar, bl              ;; jump to err <-----------------------------------------------------------------------------------eqjfewweuf 
+    mov tVar, bl               
                 
     xor bx, bx 
         cmp tVar,3
@@ -799,12 +921,14 @@ LimitOver:
     jmp L_Duration    
 
 Loan_Duration endp  
-
+                        
+;------------------------------------------------------
+;-----------------------------------DISPLAY CALCULATION
 FormulaPrt proc    
     mov ax, 0600h       ;clear screen
     xor cx, 1100h       ;start coord
     mov dx, 184Fh       ;end coord
-    mov bh, 0Ch         ;back bg, green text
+    mov bh, 0Ah         ;back bg, green text
     int 10h    
     
     ;Total           
@@ -849,12 +973,13 @@ FormulaPrt proc
     
     mov ah, 6
     mov al, 0Ch
-    mov bh, 0Ah
+    mov bh, 0Ah     ;scroll screen 10
     xor cx, cx
     mov dx, 184Fh   ;24 : 79
-    int 10h   
-               
-                             
+    int 10h     
+    
+    call GenerateFile       ;append loan into file
+                                         
     ret
                
 FormulaPrt endp    
