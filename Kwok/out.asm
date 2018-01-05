@@ -468,11 +468,11 @@ GenerateFile proc
 	;COUNTER======================================2 
     mov ah, 40h        
     mov bx, handle     
-    lea dx, counter  ; Write Hour into file
+    lea dx, count  ; Write Hour into file
 	mov cl, 1 
     int 21h  
     
-    inc counter   
+    inc count   
     	
     mov ah, 40h         
     mov bx, handle    
