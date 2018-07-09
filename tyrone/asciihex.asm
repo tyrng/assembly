@@ -3,20 +3,20 @@
 .DATA
 
 ; -------- (ADDZEROS) ADD REQUIRED ZEROS TO ASCII INPUT -------
-
 ; ASCII INPUT (UNTOUCHED)
-asciiRaw	DB		"12345$"
+asciiInRaw	DB		"$$$$$$$$$$$"
 ; ASCII INPUT (ADDZEROS)
-asciiInLi	LABEL   BYTE
-asciiInMax	DB      11
-asciiInAct	DB      ?
-asciiInStr	DB      11 DUP("$")
+asciiInZ    DB      10 DUP(48),"$"
 
-
+; -------- (SUBZEROS) SUB REQUIRED ZEROS TO ASCII OUTPUT -------
+; ASCII OUTPUT (UNTOUCHED)
+asciiOutRaw DB      "$$$$$$$$$$$"
+; ASCII OUTPUT (SUBZEROS)
+asciiOutZ   DB      "$$$$$$$$$$$"
 
 ; -------- (ASCIITOHEX) ASCII INPUT TO HEX DOUBLE WORD --------
 ; ASCII INPUT (IN STRING)
-asciiIn     DB  "4234567894$"
+asciiIn     DB  "$$$$$$$$$$$"
 ; ASCII INPUT (IN DECIMAL)
 asciiInNum  DB  10 DUP(?)
 ; HEX OUTPUT (IN HEX DOUBLE WORD)
@@ -24,7 +24,7 @@ asciiHex    DW  0,0
 
 ; -------- (HEXTOASCII) HEX DOUBLE WORD TO ASCII OUTPUT -------
 ; HEX INPUT (IN HEX DOUBLE WORD)
-hexIn       DW  0,3000
+hexIn       DW  ?,?
 ; ASCII OUTPUT (IN DECIMAL)
 hexAsciiNum DB  10 DUP(0)
 ; ASCII OUTPUT (IN STRINGS)
@@ -41,7 +41,7 @@ MAIN PROC
     MOV AX,@DATA
     MOV DS,AX
     
-    
+    CALL ADDZEROS
 	
 	EXIT:		  
     MOV AX,4C00H
@@ -49,24 +49,73 @@ MAIN PROC
 
 MAIN ENDP
 
-; (ADDZEROS) ADD REQUIRED ZEROS TO ASCII INPUT FOR ASCIITOHEX ----------------------------------
+; ADD REQUIRED ZEROS TO ASCII INPUT FOR ASCIITOHEX ---------------------------------------------
 ADDZEROS PROC
 	
 	CALL CLREG
 	
-	MOV AH,0
 	MOV SI,0
+	A_COUNTZEROS:
+	    MOV AL,asciiInRaw[SI]
+	    INC SI
+	    CMP AL,36
+	    JNE A_COUNTZEROS
 	
-	L1:
-		CMP AL,"$"
-		JNE L2
-		RET
-	L2:
-		MOV AL,asciiRaw[SI]
-		MOV asciiInLi,AL
-		INC SI
-		JMP L1
+	    MOV BX,11
+	    SUB BX,SI
+	    MOV DX,BX
+	    MOV CX,SI
+	    MOV SI,0
+	    A_TRANSFER:
+	        MOV AL,asciiInRaw[SI]
+	        MOV asciiInZ[BX],AL
+	        INC SI
+	        INC BX
+	        LOOP A_TRANSFER
+	    
+	    MOV CX,DX
+	    MOV SI,0
+	    A_REZEROS:
+	        MOV asciiInZ[SI],48
+	        INC SI
+	        LOOP A_REZEROS    
+	    
+	    
+	    CALL CLREG
+	    
+	    RET
 ADDZEROS ENDP
+
+; SUBTRACT REQUIRED ZEROS TO ASCII INPUT FOR ASCIITOHEX ----------------------------------------
+SUBZEROS PROC    
+    CALL CLREG
+    
+    MOV SI,9 ; LOOP FROM END
+    S_COUNTNUM:
+        MOV AL,asciiOutRaw[SI]
+        CMP AL,48
+        JE S_CONT
+        DEC SI
+        JMP S_COUNTNUM
+        
+    S_CONT:
+        MOV DI,SI
+        INC DI
+        MOV CX,DI
+        MOV SI,0
+        
+        
+        S_TRANSFER:
+            MOV AL,asciiOutRaw[DI]
+            MOV asciiOutZ[SI],AL
+            INC SI
+            INC DI
+            LOOP S_TRANSFER
+    
+    CALL CLREG
+    RET
+SUBZEROS ENDP
+
 ; CLEAR ALL GENERAL REGISTERS ------------------------------------------------------------------
 CLREG PROC
     XOR AX,AX
