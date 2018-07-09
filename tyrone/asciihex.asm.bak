@@ -1,0 +1,147 @@
+.MODEL SMALL
+.STACK 64
+.DATA
+
+asciinum    DB  "!234567894$"    
+num         DB  10 DUP(?)
+
+indexz      DW  ?
+          
+zeros       DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000,0,100,0,10,0,1
+result      DW  ?,?
+
+
+
+
+
+.CODE
+MAIN PROC
+    MOV AX,@DATA
+    MOV DS,AX
+    
+    CALL CLREG
+    
+    ;LOOP 10 TIMES FOR 10 DIGIT NUMBER
+    MOV CX,10
+    MOV SI,0
+    ASCII2NUM:        
+    
+        MOV AL,asciinum[SI]
+        SUB AL,30H
+        MOV num[SI],AL
+    
+        INC SI
+        
+        LOOP ASCII2NUM
+	
+	CALL CLREG
+	
+	MOV SI,0	
+	
+	ZERO:
+	MOV CL,num[SI]
+	CMP CL,0
+	JBE NEXT
+	CMP CL,9
+	JA NEXT
+	JBE ZEROSOP
+	
+	NEXT:
+	    INC SI
+	    JMP ZERO
+	
+	ZEROSOP:    
+	CMP SI,0
+	JE ZERO9    
+	CMP SI,1
+	JE ZERO8    
+	CMP SI,2
+	JE ZERO7    
+	CMP SI,3
+	JE ZERO6    
+	CMP SI,4
+	JE ZERO5    
+	CMP SI,5
+	JE ZERO4    
+	CMP SI,6
+	JE ZERO3    
+	CMP SI,7
+	JE ZERO2    
+	CMP SI,8
+	JE ZERO1
+	CMP SI,9
+	JE REMAIN    
+	JMP EXIT    
+	    
+	    
+	ZERO9:
+	    MOV indexz,0
+	    JMP ZEROSLOOP
+	
+	ZERO8:
+	    MOV indexz,4
+	    JMP ZEROSLOOP
+	
+	ZERO7:
+	    MOV indexz,8
+	    JMP ZEROSLOOP
+	
+	ZERO6:
+	    MOV indexz,12
+	    JMP ZEROSLOOP
+	
+	ZERO5:
+	    MOV indexz,16
+	    JMP ZEROSLOOP
+	    
+	ZERO4:
+	    MOV indexz,20
+	    JMP ZEROSLOOP
+	
+	ZERO3:
+	    MOV indexz,24
+	    JMP ZEROSLOOP
+	
+	ZERO2:
+	    MOV indexz,28
+	    JMP ZEROSLOOP
+	
+	ZERO1:
+	    MOV indexz,32
+	    JMP ZEROSLOOP
+	
+	REMAIN:
+	    MOV indexz,36
+	    JMP ZEROSLOOP
+	    
+	ZEROSLOOP:
+	    MOV DX,result[2]
+	    MOV DI,result[0]
+	    MOV BX,indexz
+	    ADD DX,zeros[BX+2]
+	    ADC DI,zeros[BX]
+	    MOV result[2],DX
+	    MOV result[0],DI
+	    LOOP ZEROSLOOP
+	    INC SI
+	    JMP ZERO
+	
+	EXIT:
+		  
+    MOV AX,4C00H
+    INT 21H
+
+MAIN ENDP
+
+;CLEAR REGISTERS
+CLREG PROC
+    XOR AX,AX
+    XOR BX,BX
+    XOR CX,CX
+    XOR DX,DX
+    XOR SI,SI
+    XOR DI,DI
+    RET    
+CLREG ENDP
+
+END MAIN
