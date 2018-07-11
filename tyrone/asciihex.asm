@@ -6,7 +6,7 @@
 ; ASCII INPUT (UNTOUCHED)
 asciiInRaw	DB		"$$$$$$$$$$$"
 ; ASCII INPUT (ADDZEROS)
-asciiInZ    DB      10 DUP(48),"$"
+asciiInZ    DB      "$$$$$$$$$$$"
 
 ; -------- (SUBZEROS) SUB REQUIRED ZEROS TO ASCII OUTPUT -------
 ; ASCII OUTPUT (UNTOUCHED)
@@ -20,7 +20,7 @@ asciiIn     DB  "$$$$$$$$$$$"
 ; ASCII INPUT (IN DECIMAL)
 asciiInNum  DB  10 DUP(?)
 ; HEX OUTPUT (IN HEX DOUBLE WORD)
-asciiHex    DW  0,0
+asciiHex    DW  0,0 
 
 ; -------- (HEXTOASCII) HEX DOUBLE WORD TO ASCII OUTPUT -------
 ; HEX INPUT (IN HEX DOUBLE WORD)
@@ -41,7 +41,7 @@ MAIN PROC
     MOV AX,@DATA
     MOV DS,AX
     
-    CALL ADDZEROS
+    CALL ASCIITOHEX
 	
 	EXIT:		  
     MOV AX,4C00H
@@ -133,7 +133,16 @@ CLREG ENDP
 ASCIITOHEX PROC
 
     CALL CLREG
+    
+    MOV CX,2
+    MOV SI,0
+    CL_ASCIIHEX:
+        MOV asciiHex[SI],0
+        INC SI
+        LOOP CL_ASCIIHEX         
                    
+    CALL CLREG
+
     CALL ASCIITONUM
 	
 	CALL CLREG
@@ -264,6 +273,15 @@ ZEROLOOPER ENDP
 HEXTOASCII PROC
     MOV AX,0
     MOV zeroIndex, AX 
+    
+    CALL CLREG
+    
+    MOV CX,10
+    MOV SI,0
+    CL_HEXASCIINUM:
+        MOV hexAsciiNum[SI],0
+        INC SI
+        LOOP CL_HEXASCIINUM
     
     CALL CLREG
     
