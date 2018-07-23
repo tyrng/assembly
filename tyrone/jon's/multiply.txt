@@ -1,0 +1,28 @@
+multiply PROC
+
+xor ax, ax
+xor bx, bx
+xor cx, cx
+xor dx, dx
+
+mov ax, num1[2]
+mul num2[2]
+mov ans[2], ax
+mov cx, dx
+
+mov ax, num1
+mul num2[2]
+add cx, ax
+mov bx, dx
+jnc mul_move
+add bx, 1H
+
+mul_move:
+mov ax, num1[2]
+mul num2
+add cx, ax
+mov ans[0], cx
+mov cx, dx
+
+ret 
+multiply ENDP
