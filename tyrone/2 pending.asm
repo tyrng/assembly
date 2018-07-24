@@ -85,6 +85,8 @@ IN2POST PROC
         
         CMP AX,36           ; $
         JE I2P_RIGHTP
+        CMP AX,32           ; space
+        JE I2P_SKIP
         CMP AX,40           ; (
         JE I2P_LEFTP        
         CMP AX,41           ; )
@@ -210,6 +212,10 @@ IN2POST PROC
                 INC SI
                 JMP I2P_L1    
                 
+    
+    I2P_SKIP:
+        INC SI
+        JMP I2P_L1
         
     I2P_INVALID:
         POP AX
