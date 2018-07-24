@@ -29,9 +29,12 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST
-inList      DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+inList      DB  "(123+321)x5-(44-33)x(33+66)$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
 ; POSTFIX LIST
 postList    DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+; 
+
+
 ; OPERANDS
 i2pOp1      DW  0,0
 i2pOp2      DW  0,0
@@ -74,8 +77,10 @@ IN2POST PROC
     
     ; GENERAL CHAR CHECKING
     I2P_L1:
-        MOV AX,inList[SI]
+        MOV AL,inList[SI]
         
+        CMP AX,36           ; $
+        JE I2P_RIGHTP
         CMP AX,40           ; (
         JE I2P_LEFTP        
         CMP AX,41           ; )
@@ -100,18 +105,18 @@ IN2POST PROC
         JA I2P_INVALID
         
         ; I2P_OPERAND
-        MOV BX,123          ; ADD OPERAND OPENING {
-        MOV postList[DI]
+        MOV BL,123          ; ADD OPERAND OPENING {
+        MOV postList[DI],BL
         INC DI              ; FORWARD postList
         
         
         
         I2P_OPERAND2:
-            MOV postList[DI],AX ; ADD OPERAND
+            MOV postList[DI],AL ; ADD OPERAND
             INC DI              ; FORWARD postList  
             
             INC SI              ; FORWARD inList
-            MOV AX,inList[SI]
+            MOV AL,inList[SI]
         
             ; CHECK NEXT CHAR FOR OPERAND
                             
@@ -123,21 +128,91 @@ IN2POST PROC
             JMP I2P_OPERAND2
             
             I2P_OPERANDOUT:
-                MOV BX,125      ; ADD OPERAND CLOSING }
-                MOV postList[DI],BX 
+                MOV BL,125      ; ADD OPERAND CLOSING }
+                MOV postList[DI],BL 
                 INC DI          ; FORWARD postList
-                INC SI          ; FORWARD inList
                 JMP I2P_L1
         
-         I2P_LEFTP:
+        I2P_LEFTP:
             PUSH AX
-            INC SI
+            INC SI              ; FORWARD inList
             JMP I2P_L1
          
-         I2P_RIGHTP:
+        I2P_RIGHTP:
+            POP BX            
+            CMP BX,40           ; CHECK FOR (
+            JE I2P_RIGHTPOUT
             
+            MOV postList[DI],BL ; ADD OPERATOR TO postList
+            INC DI              ; FORWARD postList
+            JMP I2P_RIGHTP
+            
+            
+            I2P_RIGHTPOUT:      ; IF ( THEN EXIT LOOP         
+                CMP AX,36       ; IF $ THEN EXIT MAIN LOOP
+                JE I2P_EXIT
+                INC SI          ; FORWARD inList
+                JMP I2P_L1
+                
+        I2P_OPERATOR:
+            POP BX  
+            
+            CMP AX,115          ; s
+            JE I2P_PREC11
+            CMP AX,94           ; ^
+            JE I2P_PREC11
+            CMP AX,113          ; q
+            JE I2P_PREC11
+            CMP AX,120          ; x
+            JE I2P_PREC10
+            CMP AX,47           ; /
+            JE I2P_PREC10
+            CMP AX,43           ; +
+            JE I2P_PREC09
+            CMP AX,45           ; -
+            JE I2P_PREC09
+                        
+            I2P_PREC09:         ; PRECEDENCE LEVEL 09 : + -    
+                CMP BX,43
+                JE I2P_APPEND
+                CMP BX,45
+                JE I2P_APPEND
+                
+            I2P_PREC10:         ; PRECEDENCE LEVEL 10 : x /    
+                CMP BX,120
+                JE I2P_APPEND
+                CMP BX,47
+                JE I2P_APPEND   
+                
+            I2P_PREC11:         ; PRECEDENCE LEVEL 11 : s ^ q    
+                CMP BX,115
+                JE I2P_APPEND
+                CMP BX,94
+                JE I2P_APPEND
+                CMP BX,113
+                JE I2P_APPEND
+                PUSH BX
+                JMP I2P_OPERATOROUT
+                
+                I2P_APPEND:
+                    MOV postList[DI],BL
+                    INC DI
+                    JMP I2P_OPERATOR
+            
+            
+            I2P_OPERATOROUT:
+                PUSH AX
+                INC SI
+                JMP I2P_L1    
+                
+        
+        I2P_INVALID:
+        
+    I2P_EXIT:  
     
-    RET
+      
+        RET    
+        
 IN2POST ENDP
 
 
