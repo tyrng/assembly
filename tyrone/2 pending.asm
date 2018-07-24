@@ -29,10 +29,14 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST
-inList      DB  "(123+321)x5-(44-33)x(33+66)$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+inList      DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
 ; POSTFIX LIST
 postList    DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
-; 
+
+
+
+; DECIMAL ADDRESS
+dotAt       DB  0  
 
 
 ; OPERANDS
@@ -99,17 +103,17 @@ IN2POST PROC
         JE I2P_OPERATOR
         CMP AX,113          ; q (square root)
         JE I2P_OPERATOR
+        CMP AX,46           ; . (decimal dot)
+        JE I2P_OPERAND
         CMP AX,48           ; operands
         JB I2P_INVALID
         CMP AX,57           ; operands
         JA I2P_INVALID
         
-        ; I2P_OPERAND
+        I2P_OPERAND:
         MOV BL,123          ; ADD OPERAND OPENING {
         MOV postList[DI],BL
         INC DI              ; FORWARD postList
-        
-        
         
         I2P_OPERAND2:
             MOV postList[DI],AL ; ADD OPERAND
@@ -119,7 +123,8 @@ IN2POST PROC
             MOV AL,inList[SI]
         
             ; CHECK NEXT CHAR FOR OPERAND
-                            
+            CMP AX,46
+            JE I2P_OPERAND2                
             CMP AX,48           ; operands
             JB I2P_OPERANDOUT
             CMP AX,57           ; operands
@@ -206,11 +211,12 @@ IN2POST PROC
                 JMP I2P_L1    
                 
         
-        I2P_INVALID:
+    I2P_INVALID:
+        POP AX
+        CALL CLREG
         
     I2P_EXIT:  
     
-      
         RET    
         
 IN2POST ENDP
