@@ -29,11 +29,14 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST
-inList      DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+inList      DB  99 DUP("$")
 ; POSTFIX LIST
-postList    DB  "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"
+postList    DB  99 DUP("$")
 
 
+; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
+; DOT TRIGGER (TRIGGER 1 IF DECIMAL DOT EXISTS)
+dotTrigger  DB  ?
 
 ; DECIMAL ADDRESS
 dotAt       DB  0  
@@ -221,37 +224,89 @@ IN2POST PROC
         POP AX
         CALL CLREG
         
-    I2P_EXIT:  
-    
+    I2P_EXIT:     
+        
+        ; CLEAR inList TO GET READY FOR REUSE
+        MOV CX,99
+        MOV SI,0
+        MOV AX,36
+            I2P_CLIN:
+                MOV inList[SI],AL
+                INC SI
+                LOOP I2P_CLIN
+        
+        CALL CLREG
         RET    
         
 IN2POST ENDP
 
 
+; POSTFIX EVALUATION GENERAL FUNCTION
+; (ORGANISATION OF OPERATIONS)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+POSTOPS PROC
+    CALL CLREG
+    
+    MOV SI,0
+    
+    PO_L1:
+        MOV AL,postList[SI]                         
+        
+        CMP AX,36           ; $
+        JE PO_END
+        CMP AX,43           ; +
+        JE PO_OPERATOR
+        CMP AX,45           ; -
+        JE I2P_OPERATOR
+        CMP AX,120          ; x
+        JE I2P_OPERATOR
+        CMP AX,47           ; /
+        JE I2P_OPERATOR
+        CMP AX,115          ; s (squared)
+        JE I2P_OPERATOR
+        CMP AX,94           ; ^ (power)
+        JE I2P_OPERATOR
+        CMP AX,113          ; q (square root)
+        JE I2P_OPERATOR    
+        
+        ; WILL MEET OPERAND OPENING {
+        ; HENCE,
+        
+        PO_OPENING:
+            
+            INC SI                  ; SKIP OPERAND OPENING {
+            
+            
+            PO_NUMBERS:
+            
+                MOV AL,postList[SI]
+                
+                CMP AX,125          ; OPERAND CLOSING }
+                JE PO_CLOSING
+                CMP AX,46           ; DECIMAL DOT .
+                JE PO_DOT
+                
+            PO_DOT:
+                MOV DX,1
+                MOV dotTrigger,DL
+                
+                INC SI              ; FORWARD postList
+                JMP PO_NUMBERS
+                
+            PO_CLOSING:
+            
+            
+        PO_OPERATOR:    
+            
+            
+        PO_END:
+            
+            
+        
+    
+    
+    RET
+POSTOPS ENDP
 
 
 
