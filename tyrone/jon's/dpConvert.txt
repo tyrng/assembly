@@ -1,0 +1,26 @@
+dpConvert PROC
+xor ax, ax
+xor bx, bx
+
+mov ax, dpConv[2]
+mov bx, dpConv[0]
+
+mov num1[0], bx
+mov num1[2], ax
+
+xor ax, ax
+mov bx, 100d
+
+mov num2[0], ax
+mov num2[2], bx
+
+call multiply
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov dpConv[0], ax
+mov dpConv[2], bx
+
+ret
+dpConvert ENDP

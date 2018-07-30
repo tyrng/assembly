@@ -28,23 +28,28 @@ zeroIndex   DW  ?
 zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000,0,100,0,10,0,1
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
-; INFIX LIST
-inList      DB  99 DUP("$")
-; POSTFIX LIST
-postList    DB  99 DUP("$")
+; INFIX LIST        127 CHARACTERS LIMIT
+inList      DB  "(4543.2 + 34234.4) x 66 - (2123 - 23245) x (6456 + 35465)", 70 DUP("$")
+; POSTFIX LIST      127 CHARACTERS LIMIT
+postList    DB  127 DUP("$")
 
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
-; DOT TRIGGER (TRIGGER 1 IF DECIMAL DOT EXISTS)
+; DOT TRIGGER (TRIGGER 1 IF DECIMAL DOT EXISTS) (0 - NONE, 1 - EXISTS, 2 - 1 DP, 2 - 3 DP, and so on)
 dotTrigger  DB  ?
+; TEMP OPERAND STRING
+tempOpStr   DB  "$$$$$$$$$$$"
+; TEMP OPERAND HEX
+tempOpHex   DW  0,0
 
-; DECIMAL ADDRESS
-dotAt       DB  0  
+; COUNT DECIMAL AFTER DOT
+countPostDot    DB  0
 
 
-; OPERANDS
-i2pOp1      DW  0,0
-i2pOp2      DW  0,0
+dpConv      DW  0,0
+num1        DW  0,0
+num2        DW  0,0
+ans         DW  0,0
 
 .CODE
 MAIN PROC
@@ -52,6 +57,8 @@ MAIN PROC
     MOV DS,AX
     
     CALL IN2POST
+	
+	CALL POSTOPS
 	
 	EXIT:		  
     MOV AX,4C00H
@@ -221,13 +228,13 @@ IN2POST PROC
         JMP I2P_L1
         
     I2P_INVALID:
-        POP AX
+        MOV SP,0
         CALL CLREG
         
     I2P_EXIT:     
         
         ; CLEAR inList TO GET READY FOR REUSE
-        MOV CX,99
+        MOV CX,127
         MOV SI,0
         MOV AX,36
             I2P_CLIN:
@@ -236,6 +243,7 @@ IN2POST PROC
                 LOOP I2P_CLIN
         
         CALL CLREG
+        
         RET    
         
 IN2POST ENDP
@@ -249,7 +257,7 @@ POSTOPS PROC
     
     MOV SI,0
     
-    PO_L1:
+    PO_L1:                  ; IMPORTANT : FROM HERE ON DO NOT CLEAR AX AND SI
         MOV AL,postList[SI]                         
         
         CMP AX,36           ; $
@@ -273,31 +281,136 @@ POSTOPS PROC
         ; HENCE,
         
         PO_OPENING:
+        
+            MOV CX,11
+            XOR DI,DI
+            MOV BX,36
+           
+            PO_CLEARSTR1:           ; CLEAR tempOpStr
+                MOV tempOpStr[DI],BL
+                INC DI
+                LOOP PO_CLEARSTR1
+            
+            XOR DX,DX               ; CLEAR tempOpHex
+            MOV tempOpHex[0],DX
+            MOV tempOpHex[2],DX
+                
+            ; DO NOT USE BX OTHER THAN countPostDot
+            MOV DI,0
+            XOR BX,BX
+            XOR DX,DX
+            MOV dotTrigger,DL       ; RESET DOT TRIGGER (0 - NONE, 1 - EXISTS, 2 - 1 DP, 2 - 3 DP, and so on)
             
             INC SI                  ; SKIP OPERAND OPENING {
             
             
             PO_NUMBERS:
-            
-                MOV AL,postList[SI]
                 
+                MOV AL,postList[SI]
+                        
                 CMP AX,125          ; OPERAND CLOSING }
-                JE PO_CLOSING
+                JE PO_CLOSING 
                 CMP AX,46           ; DECIMAL DOT .
                 JE PO_DOT
                 
+                MOV tempOpStr[DI],AL; INSERT TO TEMP OPERAND STRING
+                INC DI
+                
+                XOR DX,DX
+                MOV DL,dotTrigger
+                CMP DX,0
+                JBE PO_SKIPADDDOT
+                
+                INC BL
+                MOV dotTrigger,BL ; ADD COUNT FOR DECIMAL AFTER DOT
+            
+            PO_SKIPADDDOT:        ; NO DECIMAL
+                
+                INC SI              ; FORWARD postList
+                JMP PO_NUMBERS
+                
             PO_DOT:
-                MOV DX,1
-                MOV dotTrigger,DL
+                XOR DX,DX
+                MOV DL,dotTrigger
+                CMP DL,0            ; DETECTS MULTIPLE DOTS AND PROMPT ERROR
+                JA PO_ERROR
+                
+                INC BL              ; DOT DETECTED
+                MOV dotTrigger,BL
                 
                 INC SI              ; FORWARD postList
                 JMP PO_NUMBERS
                 
             PO_CLOSING:
-            
+                ; TRANSFER TO asciiIn
+                MOV CX,11
+                XOR DI,DI
+                XOR DX,DX
+           
+                PO_TRANSFERSTR1:           ; CLEAR tempOpStr 
+                    MOV BL,tempOpStr[DI]
+                    MOV asciiIn[DI],BL
+                    INC DI
+                    LOOP PO_TRANSFERSTR1
+                
+                CALL ASCIITOHEX
+                
+                MOV DX,asciiHex[0]
+                MOV tempOpHex[0],DX
+                MOV DX,asciiHex[2]
+                MOV tempOpHex[2],DX
+                
+                XOR DX,DX
+                
+                MOV DX,tempOpHex[0]
+                MOV dpConv[0],DX
+                MOV DX,tempOpHex[2]
+                MOV dpConv[2],DX
+                
+                XOR DX,DX
+                
+                MOV BL,dotTrigger
+                CMP BL,0            ; NO DP
+                JE PO_0DP
+                CMP BL,2            ; 1 DP
+                JE PO_1DP
+                CMP BL,3            ; 2 DP
+                JE PO_2DP
+                CMP BL,6            ; MORE THAN 5 DIGITS
+                JA PO_ERROR
+                
+                PO_xDP:             ; BETWEEN 3 TO 5 DIGITS
+                    ; PENDING   
+                
+                
+                PO_0DP:             ; ADD ZEROS (CONVERT TO 2DP)
+                    CALL dpConvert
+                
+                PO_1DP:             ; ADD ZEROS (CONVERT TO 2DP)
+                    CALL dpConvert
+                
+                PO_2DP:             ; PUSH TO STACK (TWICE)
+                    MOV DX,dpConv[0]
+                    MOV tempOpHex[0],DX
+                    MOV DX,dpConv[2]
+                    MOV tempOpHex[2],DX
+                
+                    XOR DX,DX
+                    
+                    MOV DX,tempOpHex[2]
+                    PUSH DX
+                    MOV DX,tempOpHex[0]
+                    PUSH DX
+                    
+                    INC SI
+                    JMP PO_L1
+                
             
         PO_OPERATOR:    
             
+        
+        PO_ERROR:
+            MOV SP,0
             
         PO_END:
             
@@ -308,10 +421,33 @@ POSTOPS PROC
     RET
 POSTOPS ENDP
 
+; DECIMAL POINT CONVERTOR
+dpConvert PROC
+xor ax, ax
+xor bx, bx
 
+mov ax, dpConv[2]
+mov bx, dpConv[0]
 
+mov num1[0], bx
+mov num1[2], ax
 
+xor ax, ax
+mov bx, 10d
 
+mov num2[0], ax
+mov num2[2], bx
+
+call multiply
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov dpConv[0], ax
+mov dpConv[2], bx
+
+ret
+dpConvert ENDP 
 
 ; ASCII STRING TO HEXADECIMAL DOUBLE WORD (STORED IN TWO WORDS) --------------------------------
 
@@ -528,5 +664,33 @@ HEXTOASCII PROC
     
 HEXTOASCII ENDP
 
+multiply PROC
+
+xor ax, ax
+xor bx, bx
+xor cx, cx
+xor dx, dx
+
+mov ax, num1[2]
+mul num2[2]
+mov ans[2], ax
+mov cx, dx
+
+mov ax, num1
+mul num2[2]
+add cx, ax
+mov bx, dx
+jnc mul_move
+add bx, 1H
+
+mul_move:
+mov ax, num1[2]
+mul num2
+add cx, ax
+mov ans[0], cx
+mov cx, dx
+
+ret 
+multiply ENDP
 
 END MAIN
