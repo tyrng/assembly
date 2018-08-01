@@ -7,7 +7,7 @@
 ; ASCII INPUT (UNTOUCHED)
 asciiIn     DB  "$$$$$$$$$$$" 
 ; ASCII INPUT (ADDZEROS)
-asciiInZ    DB      10 DUP(48),"$"
+asciiInZ    DB  "$$$$$$$$$$$"
 ; ASCII INPUT (IN DECIMAL)
 asciiInNum  DB  10 DUP(?)
 ; HEX OUTPUT (IN HEX DOUBLE WORD)
@@ -19,7 +19,10 @@ hexIn       DW  ?,?
 ; HEX INPUT (TEMPORARY)
 tempHex     DW  ?,?
 ; ASCII OUTPUT (IN STRINGS)
-hexAscii    DB  12 DUP("$")
+hexAscii    DB  11 DUP("$")
+
+; -------- (ADDDOT) ADD DECIMAL DOT TO FINAL RESULT---- -------
+asciiDot    DB  12 DUP("$")
 
 ; ------- (ASCIITOHEX,HEXTOASCII) SHARED  ---------------------
 ; CURRENT INDEX OF ASCII INPUT IN DECIMAL STRING (EG '3' of '4321' IS INDEX 1)
@@ -29,7 +32,7 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST        127 CHARACTERS LIMIT
-inList      DB  "(4543.2 + 34234.4) x 66 - (2123 - 23245) x (6456 + 35465)", 70 DUP("$")
+inList      DB  "(43.2 + 34.4) x 6 s", 108 DUP("$")
 ; POSTFIX LIST      127 CHARACTERS LIMIT
 postList    DB  127 DUP("$")
 
@@ -42,15 +45,45 @@ tempOpStr   DB  "$$$$$$$$$$$"
 ; TEMP OPERAND HEX
 tempOpHex   DW  0,0
 ; COUNT DECIMAL AFTER DOT
-countPostDot    DB  0
-
+countPostDot    DB  0 
+; postList INDEX
+postSI      DW  0
+; tempOpStr INDEX
+tempDI      DW  0
+; TEMPORARY NUMBER
+tempNum     DW  0,0
 ; ------------------ (dpConvert) DECIMAL POINT CONVERTER, CONVERT 0 OR 1 DP TO 2 DP (RUN TWICE FOR 0DP to 2DP) ----------------------
 dpConv      DW  0,0
+                        
+                        
+;GENERAL VARIABLES
+num1 dw 0000H, 0000H
+num2 dw 0000H, 0000H
 
 
-num1        DW  0,0
-num2        DW  0,0
-ans         DW  0,0
+ans dw 0000H, 0000H
+
+;POWER FUNCTION VARIABLES
+pow_counter dw ?
+pow_of dw 0
+temp_pow dw 0, 0
+
+
+;Division variables
+tens    dw      10d, 100d, 1000d
+rmdr    dw      ?
+temp_rmdr dw    ?
+temp_dp dw      0000h, 0000h
+dp      db      0, 0
+
+
+; SQRT variables
+int32 dd 0
+squareRoot dw ?
+
+;ERROR MEESAGE STRINGS
+err db 0
+err_str1 db "SYNTAX ERROR!$",10,13,24
 
 .CODE
 MAIN PROC
@@ -60,6 +93,10 @@ MAIN PROC
     CALL IN2POST
 	
 	CALL POSTOPS
+    
+    CALL HEXTOASCII
+    
+    CALL ADDDOT
 	
 	EXIT:		  
     MOV AX,4C00H
@@ -219,6 +256,37 @@ IN2POST PROC
             
             
             I2P_OPERATOROUT:
+                CMP AX,115          ; s
+                JE I2P_SQUARED
+                CMP AX,113          ; q
+                JE I2P_SQRT
+                JMP I2P_OPERATOROUT2
+                
+                I2P_SQUARED:    ; ADD {2} TO postList FOR SQUARED
+                    MOV DX,123
+                    MOV postList[DI],DL
+                    INC DI
+                    MOV DX,50   ; 2 IN ASCII    
+                    MOV postList[DI],DL
+                    INC DI
+                    MOV DX,125
+                    MOV postList[DI],DL
+                    INC DI
+                    JMP I2P_OPERATOROUT2
+                
+                I2P_SQRT:       ; ADD {2} TO postList FOR SQUARED (2 IS ACTUALLY A DUMB VALUE)
+                    MOV DX,123
+                    MOV postList[DI],DL
+                    INC DI
+                    MOV DX,50   ; 2 IN ASCII    
+                    MOV postList[DI],DL
+                    INC DI
+                    MOV DX,125
+                    MOV postList[DI],DL
+                    INC DI
+                    JMP I2P_OPERATOROUT2 
+            
+            I2P_OPERATOROUT2:
                 PUSH AX
                 INC SI
                 JMP I2P_L1    
@@ -257,8 +325,11 @@ POSTOPS PROC
     CALL CLREG
     
     MOV SI,0
+    MOV postSI,SI
     
     PO_L1:                  ; IMPORTANT : FROM HERE ON DO NOT CLEAR AX AND SI
+        XOR AH,AH
+        MOV SI,postSI
         MOV AL,postList[SI]                         
         
         CMP AX,36           ; $
@@ -266,17 +337,17 @@ POSTOPS PROC
         CMP AX,43           ; +
         JE PO_OPERATOR
         CMP AX,45           ; -
-        JE I2P_OPERATOR
+        JE PO_OPERATOR
         CMP AX,120          ; x
-        JE I2P_OPERATOR
+        JE PO_OPERATOR
         CMP AX,47           ; /
-        JE I2P_OPERATOR
+        JE PO_OPERATOR
         CMP AX,115          ; s (squared)
-        JE I2P_OPERATOR
+        JE PO_OPERATOR
         CMP AX,94           ; ^ (power)
-        JE I2P_OPERATOR
+        JE PO_OPERATOR
         CMP AX,113          ; q (square root)
-        JE I2P_OPERATOR    
+        JE PO_OPERATOR    
         
         ; WILL MEET OPERAND OPENING {
         ; HENCE,
@@ -286,7 +357,8 @@ POSTOPS PROC
             MOV CX,11
             XOR DI,DI
             MOV BX,36
-           
+            
+            
             PO_CLEARSTR1:           ; CLEAR tempOpStr
                 MOV tempOpStr[DI],BL
                 INC DI
@@ -298,16 +370,18 @@ POSTOPS PROC
                 
             ; DO NOT USE BX OTHER THAN countPostDot
             MOV DI,0
+            MOV tempDI,DI
             XOR BX,BX
             XOR DX,DX
             MOV dotTrigger,DL       ; RESET DOT TRIGGER (0 - NONE, 1 - EXISTS, MORE THAN 1 - ERROR)
             MOV countPostDot,DL     ; RESET DECIMAL COUNT AFTER DOT
             
             INC SI                  ; SKIP OPERAND OPENING {
-            
+            MOV postSI,SI
             
             PO_NUMBERS:
-                
+                XOR AH,AH
+                MOV SI,postSI
                 MOV AL,postList[SI]
                 
                 ; CHECK FOR } and .
@@ -318,9 +392,10 @@ POSTOPS PROC
                 JE PO_DOT
                 
                 ; IF NOT } AND .
-                
+                MOV DI,tempDI
                 MOV tempOpStr[DI],AL; INSERT TO TEMP OPERAND STRING
                 INC DI
+                MOV tempDI,DI
                 
                 XOR DX,DX
                 MOV DL,dotTrigger
@@ -333,6 +408,7 @@ POSTOPS PROC
             PO_SKIPADDDOT:          ; NO DECIMAL
                 
                 INC SI              ; FORWARD postList
+                MOV postSI,SI
                 JMP PO_NUMBERS
                 
             PO_DOT:
@@ -347,6 +423,7 @@ POSTOPS PROC
                 XOR DX,DX
                 
                 INC SI              ; FORWARD postList
+                MOV postSI,SI
                 JMP PO_NUMBERS
                 
             PO_CLOSING:
@@ -354,14 +431,14 @@ POSTOPS PROC
                 MOV CX,11
                 XOR DI,DI
                 XOR DX,DX
-           
+                
                 PO_TRANSFERSTR1:    ; TRANSFER tempOpStr TO asciiIn
                     MOV BL,tempOpStr[DI]
                     MOV asciiIn[DI],BL
                     INC DI
                     LOOP PO_TRANSFERSTR1
                 
-                CALL ASCIITOHEX
+                CALL ASCIITOHEX     ; ALL REGISTERS ARE CLEARED RIGHT AFTER CALL
                 
                 MOV DX,asciiHex[0]
                 MOV tempOpHex[0],DX
@@ -408,25 +485,136 @@ POSTOPS PROC
                     MOV DX,tempOpHex[2]
                     PUSH DX
                     MOV DX,tempOpHex[0]
-                    PUSH DX
+                    PUSH DX 
                     
+                    MOV SI,postSI
                     INC SI          ; FORWARD postList
+                    MOV postSI,SI
                     JMP PO_L1
                 
             
         PO_OPERATOR:    
+            XOR BX,BX
+            POP BX
+            MOV num2[0],BX
+            XOR BX,BX
+            POP BX
+            MOV num2[2],BX
+            XOR BX,BX
+            POP BX
+            MOV num1[0],BX
+            XOR BX,BX
+            POP BX
+            MOV num1[2],BX
             
+            XOR BX,BX
+            
+            CMP AX,43           ; +
+            JE PO_ADDITION
+            CMP AX,45           ; -
+            JE PO_SUBTRACT
+            CMP AX,120          ; x
+            JE PO_MULTIPLY
+            CMP AX,47           ; /
+            JE PO_DIVISION
+            CMP AX,115          ; s (squared)
+            JE PO_POWER
+            CMP AX,94           ; ^ (power)
+            JE PO_POWER
+            CMP AX,113          ; q (square root)
+            JE PO_SQRT
+           
+            ; FROM HERE ON AX IS REPLACED BY OPERATOR FUNCTIONS
+            
+            PO_ADDITION:
+                CALL addition
+                JMP PO_OPERATOROUT
+                
+            PO_SUBTRACT:
+                CALL subtract
+                JMP PO_OPERATOROUT      
+            
+            PO_MULTIPLY:
+                CALL multiply
+                MOV BX,ans[2]
+                MOV num1[2],BX
+                MOV BX,ans[0]
+                MOV num1[0],BX
+                MOV num2[0],0
+                MOV num2[2],10000
+                XOR BX,BX
+                CALL division
+                JMP PO_OPERATOROUT
+            
+            PO_DIVISION:
+                CALL division
+                JMP PO_OPERATOROUT
+                
+            PO_POWER:
+                MOV BX,num1[0]
+                MOV tempNum[0],BX
+                MOV BX,num1[2]
+                MOV tempNum[2],BX
+                MOV BX,num2[0]
+                MOV num1[0],BX
+                MOV BX,num2[2],BX
+                MOV num1[2],BX
+                MOV BX,10000
+                MOV num2[2],BX
+                MOV BX,0
+                MOV num2[0],BX
+                CALL division
+                MOV BX,ans[0]
+                MOV num2[0],BX
+                MOV BX,ans[2]
+                MOV num2[2],BX
+                MOV BX,tempNum[0]
+                MOV num1[0],BX
+                MOV BX,tempNum[2]
+                MOV num1[2],BX
+                MOV BX,num2[2]
+                MOV pow_of,BX
+                CALL power                     
+                JMP PO_OPERATOROUT
+                
+            PO_SQRT:
+                ;CALL sqrt
+                JMP PO_OPERATOROUT     
+            
+            PO_OPERATOROUT:
+                MOV BX,ans[2]
+                PUSH BX
+                MOV BX,ans[0]
+                PUSH BX   
+                
+                MOV SI,postSI
+                INC SI
+                MOV postSI,SI
+                JMP PO_L1    
+             
         
         PO_ERROR:
             MOV SP,0
             
         PO_END:
+            POP AX              ; FINAL ANSWER
+            MOV hexIn[0],AX
+            POP AX
+            MOV hexIn[2],AX
             
+            ; CLEAR postList    
+            MOV CX,127
+            MOV SI,0
+            MOV AX,36
+            PO_CLPOST:
+                MOV postList[SI],AL
+                INC SI
+                LOOP PO_CLPOST
+        
+        CALL CLREG
             
         
-    
-    
-    RET
+        RET
 POSTOPS ENDP
 
 ; DECIMAL POINT CONVERTOR
@@ -497,6 +685,10 @@ ASCIITONUM ENDP
 ZEROLOOPER PROC
     ;INSERT INDEX HERE (CHANGE '0' TO VARIABLE)
 	MOV SI,0	       
+	
+	; CLEAR asciiHex
+	MOV asciiHex[0],SI
+	MOV asciiHex[2],SI
 	
 	ZERO:
 	MOV CL,asciiInNum[SI]
@@ -635,6 +827,16 @@ HEXTOASCII PROC
     
     CALL CLREG
     
+    ; CLEAR hexAscii
+    MOV CX,11
+    MOV SI,0
+    H_CLHEXASCII:
+        MOV hexAscii[SI],36
+        INC SI
+        LOOP H_CLHEXASCII
+    
+    CALL CLREG
+    
     MOV SI, offset hexAscii
     MOV BX,10
     MOV CX,0
@@ -643,6 +845,8 @@ HEXTOASCII PROC
     MOV tempHex,AX
     MOV AX,hexIn[2]
     MOV tempHex[2],AX
+    
+    
     
     H_EXTRACT:
         MOV DX,0
@@ -672,6 +876,205 @@ HEXTOASCII PROC
     
 HEXTOASCII ENDP
 
+ADDDOT PROC
+    
+    CALL CLREG
+    
+    ; CLEAR asciiDot
+    MOV CX,12
+    MOV SI,0
+    AD_CLASCIIDOT:
+        MOV asciiDot[SI],36
+        INC SI
+        LOOP AD_CLASCIIDOT
+    
+    CALL CLREG
+    
+    MOV SI,0
+    AD_CHECKHEXASCII:
+        MOV AL,hexAscii[SI]
+        CMP AX,36
+        JE AD_CONTINUE1
+        
+        INC SI
+        JMP AD_CHECKHEXASCII
+        
+    AD_CONTINUE1:
+        ; SI HOLDS THE CHARACTER COUNT
+        MOV CX,SI
+        INC CX                  ; ADDS SPACE FOR DECIMAL DOT
+        MOV BX,CX
+        SUB BX,3                ; HOLDS POSITION OF DECIMAL DOT
+        MOV SI,0
+        AD_TRANSFER:
+            CMP SI,BX
+            JE AD_DOT
+            MOV AL,hexAscii[SI]
+            MOV asciiDot[SI],AL    
+            INC SI
+            LOOP AD_TRANSFER    
+        
+        AD_DOT:
+            MOV DL,hexAscii[SI+1]
+            CMP DL,48           ; COMPARE LAST DIGIT WITH 0
+            JNE AD_2D           ; IF NOT 0, THEN IS 2 DECIMAL
+            MOV DL,hexAscii[SI]
+            CMP DL,48           ; COMPARE 2ND LAST DIGIT WITH 0
+            JE AD_CONTINUE2     ; IF IS 0, THEN IS NO DECIMAL
+            JNE AD_1D
+            
+            AD_1D:
+                MOV DL,46       ; ADD DOT
+                MOV asciiDot[SI],DL
+                MOV AL,hexAscii[SI]
+                INC SI
+                MOV asciiDot[SI],AL 
+                JMP AD_CONTINUE2
+                
+            AD_2D:
+                MOV DL,46       ; ADD DOT
+                MOV asciiDot[SI],DL
+                MOV AL,hexAscii[SI]
+                INC SI
+                MOV asciiDot[SI],AL
+                MOV AL,hexAscii[SI]
+                INC SI
+                MOV asciiDot[SI],AL
+                JMP AD_CONTINUE2
+            
+;                AD_0D:
+;                MOV AL,hexAscii[SI]
+;                MOV asciiDOt[SI],AL    
+            
+        AD_CONTINUE2:
+            CALL CLREG
+            
+            RET
+            
+ADDDOT ENDP
+
+ERROR_MSG PROC
+
+mov ah, 09H
+lea dx, err_str1
+int 21H
+
+ret 
+ERROR_MSG ENDP
+
+power PROC
+;====================WELCOME TO THE POWER FUNCTION==============
+
+;--ERROR CHECKING---
+cmp ans[0], 0H
+JNE ERROR_MSG
+JNZ  pow_exit
+
+;PRESETS FOR POWER LOOP
+
+mov ax, num1[0]
+mov bx, num1[2]
+
+mov temp_pow[0], ax
+mov temp_pow[2], bx
+
+XOR CX, CX
+MOV CX, pow_of		;SET LOOP COUNTER TO POWER OF X
+SUB CX, 1
+
+BIG_LOOP:
+mov pow_counter, cx
+
+;---POWER FORMULA---
+POWER_CALC:
+                
+;===temp power===
+mov ax, temp_pow[0]
+mov bx, temp_pow[2]
+
+mov num2[0], ax
+mov num2[2], bx
+
+call multiply
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov num1[0], ax
+mov num1[2], bx
+
+;===ROUND OFF 3rd and 4th decimal place===
+pow_decimalRound:
+mov ax, 0
+mov bx, 10000d
+
+mov num2[0], ax
+mov num2[2], bx
+
+call division
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov num1[0], ax
+mov num1[2], bx
+
+;===loop back power===
+
+mov cx, pow_counter
+
+cmp cx, 0
+je pow_exit
+
+
+loop BIG_LOOP
+
+
+pow_exit:
+ 
+ret 
+power ENDP
+
+
+addition PROC
+xor ax, ax
+xor bx, bx
+
+mov ax, num1[2]
+mov bx, num2[2]
+add ax, bx
+
+mov ans+2, ax
+mov ax, num1
+mov bx, num2
+adc ax,bx
+
+mov ans, ax   
+   
+ret 
+addition ENDP
+
+
+subtract PROC
+xor ax, ax
+xor bx, bx
+xor dx, dx
+
+mov ax, num1[2]
+mov bx, num2[2]
+sub ax, bx
+mov ans[2], ax
+
+mov ax, num1
+mov bx, num2
+sbb ax, bx
+mov ans, ax
+
+ret
+subtract ENDP
+
+
+
 multiply PROC
 
 xor ax, ax
@@ -700,5 +1103,190 @@ mov cx, dx
 
 ret 
 multiply ENDP
+
+division PROC
+;================  
+
+
+
+mov     cx, num2[2]                ;cx = dvsr
+xor     dx,dx                  ;dx = 0
+
+;---clear temp_rmdr
+mov temp_rmdr, dx
+
+mov     ax, num1[0]    ;ax = high order numerator
+div     cx                     ;dx = rem, ax = high order quotient
+mov     ans[0], ax   ;store high order quotient
+mov     ax, num1[2]      ;ax = low  order numerator
+div     cx                     ;dx = rem, ax = low  order quotient
+mov     ans[2], ax     ;store low  order quotient
+mov     rmdr, dx     ;store remainder
+
+;---CONVERT REMAINDER---
+mov si, 0
+
+cmp rmdr, 0
+je normal_div       ;changes
+
+div_check:
+inc si
+
+mov ax, rmdr
+mul tens[0]
+
+jc  cutDiv
+
+conv_dp:
+mov ax, rmdr
+mul tens[0]
+
+xor dx, dx
+mov cx, num2[2]
+div cx
+
+mov rmdr, dx
+
+cmp si, 1
+je  bxMul
+
+cmp si, 2
+je  bxPlus
+ja  cx_roundOff      
+      
+bxMul:
+mul tens[0]
+mov bx, ax
+jmp div_check
+
+bxPlus:
+add bx, ax
+jmp div_check
+
+cx_roundOff:
+cmp ax, 5
+jae incBx
+
+mov temp_rmdr, bx
+jmp normal_div
+
+incBx:
+inc bx
+mov temp_rmdr, bx
+jmp normal_div      
+      
+;====
+cutDiv:
+xor dx, dx
+mov ax, num2[2]
+div tens[0]
+
+mov num2[2], ax
+mov cx, ax
+
+xor dx, dx
+mov ax, rmdr
+div cx
+
+mov rmdr, dx
+
+cmp si, 1
+je bxMul
+
+cmp si, 2
+je bxPlus
+ja cx_roundOff
+
+;--normal shiz
+normal_div:
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov num1[0], ax
+mov num1[2], bx
+
+mov ax, 100
+mov num2[2], ax
+
+call multiply
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov num1[0], ax
+mov num1[2], bx
+
+mov ax, temp_rmdr
+mov num2[2], ax
+
+call addition
+
+;---Dividend END POINT OF RECURSION---
+cmp di, 0
+je dp_checker
+pop dx
+jmp divExit
+
+;---Decimal Point CHECKING---
+dp_checker:         ;CHECK DP (DUH!)
+mov ax, word ptr dp
+xor ax, 0202h 
+                 
+cmp ax, 0000h
+  jz divExit
+
+cmp ax, 0202h
+  je divExit
+                                 
+cmp ax, 0200h
+  je dividend_dec	;Jump if dvidivend has decimal
+  jne divisor_dec	;Jump if divisor has decimal
+
+
+;dividend shiz
+dividend_dec:
+
+mov ax, ans[0]
+mov bx, ans[2]
+
+mov num1[0], ax
+mov num1[2], bx
+
+mov ax, 10000d
+mov num2[2], ax 
+
+mov di, 1
+call division       ;======RECURSION!!!=======
+
+;divisor shiz
+divisor_dec:
+
+
+jmp divExit
+
+divExit:
+ret
+
+division ENDP
+
+;sqrt PROC
+;mov ax, num1[0]
+;mov bx, num1[2]
+;
+;mov word ptr int32, bx
+;mov word ptr int32 + 2, ax
+;
+;fild int32        ;load the integer to ST(0)
+;fsqrt             ;compute square root and store to ST(0)
+;fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
+;
+;mov ax, word ptr squareRoot
+;mov ans[2], ax
+;mov bx, 0
+;mov ans[0], bx
+;
+;ret
+;sqrt ENDP
 
 END MAIN
