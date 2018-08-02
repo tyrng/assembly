@@ -21,8 +21,14 @@ tempHex     DW  ?,?
 ; ASCII OUTPUT (IN STRINGS)
 hexAscii    DB  11 DUP("$")
 
-; -------- (ADDDOT) ADD DECIMAL DOT TO FINAL RESULT---- -------
-asciiDot    DB  12 DUP("$")
+; -------- (ADDDOT) ADD DECIMAL DOT TO FINAL RESULT------------
+; *************************************************************
+; *************************************************************
+; *************************************************************
+asciiDot    DB  12 DUP("$")                      ; FINAL OUTPUT                                    
+; *************************************************************
+; *************************************************************
+; *************************************************************
 
 ; ------- (ASCIITOHEX,HEXTOASCII) SHARED  ---------------------
 ; CURRENT INDEX OF ASCII INPUT IN DECIMAL STRING (EG '3' of '4321' IS INDEX 1)
@@ -32,7 +38,7 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST        127 CHARACTERS LIMIT
-inList      DB  "(43.2 + 34.4) x 6 s", 108 DUP("$")
+inList      DB  "(14356.278 + 53888.4) x 2s + (423 - 114) x (656 + 665) + 4^4 + 10000000", 56 DUP("$")
 ; POSTFIX LIST      127 CHARACTERS LIMIT
 postList    DB  127 DUP("$")
 
@@ -52,6 +58,8 @@ postSI      DW  0
 tempDI      DW  0
 ; TEMPORARY NUMBER
 tempNum     DW  0,0
+; tempCX
+tempCX      DW  ?
 ; ------------------ (dpConvert) DECIMAL POINT CONVERTER, CONVERT 0 OR 1 DP TO 2 DP (RUN TWICE FOR 0DP to 2DP) ----------------------
 dpConv      DW  0,0
                         
@@ -465,8 +473,29 @@ POSTOPS PROC
                 JA PO_ERROR
                 
                 PO_xDP:             ; BETWEEN 3 TO 5 DIGITS
-                    ; PENDING   
-                
+                    XOR CX,CX
+                    MOV tempCX,CX
+                    SUB BL,2
+                    MOV CL,BL
+                    MOV tempCX,CX
+                    PO_xDPL1:
+                        MOV tempCX,CX
+                        MOV DX,tempOpHex[0]
+                        MOV num1[0],DX
+                        MOV DX,tempOpHex[2]
+                        MOV num1[2],DX
+                        XOR DX,DX
+                        MOV num2[0],DX
+                        MOV num2[2],1000
+                        CALL division
+                        MOV DX,ans[0]
+                        MOV tempOpHex[0],DX
+                        MOV DX,ans[2]
+                        MOV tempOpHex[2],DX
+                        XOR DX,DX
+                        MOV CX,tempCX
+                        LOOP PO_xDPL1
+                    JMP PO_xDPEXIT                        
                 
                 PO_0DP:             ; ADD ZEROS (CONVERT TO 2DP)
                     CALL dpConvert
@@ -481,7 +510,8 @@ POSTOPS PROC
                     MOV tempOpHex[2],DX
                 
                     XOR DX,DX
-                    
+                
+                PO_xDPEXIT:    
                     MOV DX,tempOpHex[2]
                     PUSH DX
                     MOV DX,tempOpHex[0]
@@ -667,10 +697,10 @@ ASCIITOHEX PROC
 ASCIITOHEX ENDP
 
 ASCIITONUM PROC
-    ;LOOP 10 TIMES FOR 10 DIGIT NUMBER
-    MOV CX,10
+
     MOV SI,0
-    ASCII2NUM:        
+        
+        ASCII2NUM:        
     
         MOV AL,asciiInZ[SI]
         SUB AL,30H
@@ -678,7 +708,8 @@ ASCIITONUM PROC
     
         INC SI
         
-        LOOP ASCII2NUM
+        CMP SI,10
+        JB ASCII2NUM
     RET
 ASCIITONUM ENDP
 
