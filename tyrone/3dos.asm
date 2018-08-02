@@ -172,7 +172,8 @@ squareRoot dw ?
             db "$"
 
     logo12  db 10,13,"                          . @(                     @@"
-            db 10,13,"                           Press any key to continue..."
+;            db 10,13,"                           Press any key to continue..."
+			db 10,13,"                              *@.@@ @@ @@ @@ @@@*@"
             db "$"
 
 ;---------------------------------------------------------------------------------------
@@ -326,37 +327,49 @@ IN2POST PROC
         MOV AL,inList[SI]
         
         CMP AX,36           ; $
-        JE I2P_RIGHTP
+        JE E_I2P_RIGHTP
         CMP AX,32           ; space
         JE E_I2P_SKIP
         CMP AX,40           ; (
-        JE I2P_LEFTP        
+        JE E_I2P_LEFTP        
         CMP AX,41           ; )
-        JE I2P_RIGHTP       
+        JE E_I2P_RIGHTP       
         CMP AX,43           ; +
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,45           ; -
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,120          ; x
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,47           ; /
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,115          ; s (squared)
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,94           ; ^ (power)
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,113          ; q (square root)
-        JE I2P_OPERATOR
+        JE E_I2P_OPERATOR
         CMP AX,46           ; . (decimal dot)
-        JE I2P_OPERAND
+        JE E_I2P_OPERAND
         CMP AX,48           ; operands
         JB E_I2P_INVALID2
         CMP AX,57           ; operands
         JA E_I2P_INVALID2
         JMP I2P_OPERAND
         
+		E_I2P_RIGHTP:
+			JMP I2P_RIGHTP
+		
         E_I2P_SKIP:
             JMP I2P_SKIP
+            
+        E_I2P_LEFTP:
+            JMP I2P_LEFTP
+            
+        E_I2P_OPERATOR:
+            JMP I2P_OPERATOR
+            
+        E_I2P_OPERAND:
+            JMP I2P_OPERAND
             
         E_I2P_INVALID2:
             JMP I2P_INVALID2
@@ -383,13 +396,16 @@ IN2POST PROC
             
             ; I2P_OPERANDLENGTH1
                 CMP BP,10
-                JA I2P_INVALID
+                JA E_I2P_INVALID
                 JMP I2P_OPERAND21
                 
             I2P_OPERANDLENGTH2:
                 CMP BP,11
-                JA I2P_INVALID
+                JA E_I2P_INVALID
                 JMP I2P_OPERAND21
+				
+			E_I2P_INVALID:
+				JMP I2P_INVALID
                 
         ; CHECK NEXT CHAR FOR OPERAND
         I2P_OPERAND21:
@@ -758,14 +774,18 @@ POSTOPS PROC
                     xor dx,dx
                     mov dl,errorFlag
                     cmp dl,0
-                    jne po_error 
+                    jne e_po_error
+					jmp PO_1DP
+					
+					e_po_error:
+						jmp po_error
                 
                 PO_1DP:             ; ADD ZEROS (CONVERT TO 2DP)
                     CALL dpConvert 
                     xor dx,dx
                     mov dl,errorFlag
                     cmp dl,0
-                    jne po_error
+                    jne e_po_error
                 
                 PO_2DP:             ; PUSH TO STACK (TWICE)
                     MOV DX,dpConv[0]
@@ -876,7 +896,7 @@ POSTOPS PROC
                 JMP PO_OPERATOROUT
                 
             PO_SQRT:
-;                CALL sqrt
+                CALL sqrt
                 JMP PO_OPERATOROUT     
             
             PO_OPERATOROUT:
@@ -1340,9 +1360,16 @@ power PROC
 
 ;--ERROR CHECKING---
 cmp ans[0], 0H
-JNE ERROR_MSG
-JNZ  pow_exit
+JNE pow_error
+JE pow_continue
 
+pow_error:
+XOR AX,AX
+MOV AL,4
+MOV errorFlag,AL
+JMP  pow_exit
+
+pow_continue:
 ;PRESETS FOR POWER LOOP
 
 mov ax, num1[0]
@@ -1687,44 +1714,44 @@ ret
 
 division ENDP
 
-;sqrt PROC
-;
-;;----CLEAR----
-;xor ax, ax
-;xor bx, bx
-;mov word ptr int32, ax
-;mov word ptr int32 + 2, ax
-;mov word ptr squareRoot, ax
-;mov word ptr squareRoot + 2, ax
-;
-;;---Initialization for squareRoot---
-;mov ax, num1[0]
-;mov bx, num1[2]
-;
-;mov word ptr int32, bx
-;mov word ptr int32 + 2, ax
-;
-;fild int32        ;load the integer to ST(0)
-;fsqrt             ;compute square root and store to ST(0)
-;fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
-;
-;mov ax, word ptr squareRoot
-;mov ans[2], ax
-;mov bx, 0
-;mov ans[0], bx
-;
-;;---Fix decimals---
-;mov ax, ans[2]
-;mov num1[0], bx
-;mov num1[2], ax
-;
-;mov num2[0], bx
-;mov num2[2], 10d
-;
-;call multiply
-;
-;ret
-;sqrt ENDP
+sqrt PROC
+
+;----CLEAR----
+xor ax, ax
+xor bx, bx
+mov word ptr int32, ax
+mov word ptr int32 + 2, ax
+mov word ptr squareRoot, ax
+mov word ptr squareRoot + 2, ax
+
+;---Initialization for squareRoot---
+mov ax, num1[0]
+mov bx, num1[2]
+
+mov word ptr int32, bx
+mov word ptr int32 + 2, ax
+
+fild int32        ;load the integer to ST(0)
+fsqrt             ;compute square root and store to ST(0)
+fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
+
+mov ax, word ptr squareRoot
+mov ans[2], ax
+mov bx, 0
+mov ans[0], bx
+
+;---Fix decimals---
+mov ax, ans[2]
+mov num1[0], bx
+mov num1[2], ax
+
+mov num2[0], bx
+mov num2[2], 10d
+
+call multiply
+
+ret
+sqrt ENDP
 
 
 ; ================================ OLD CODES ===================================
