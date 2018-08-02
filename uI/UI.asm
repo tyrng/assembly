@@ -3,8 +3,6 @@
 .data     
 ; Mouse Variables -------------------------------------------------------------
     Mode db 0                   ; 0 - keyboard, 1 - mouse          
-    str0 db "Keyboard$"
-    str1 db "Mouse   $"
     ; constant for dx
     start_Row db 38h               ; top left corner as starting box edge
     end_Row db 47h                 ; end corner  
@@ -20,7 +18,7 @@
 ; Change Row and Column area here ---------------------------------------------
     Row dw 0200h                ; Updates row positions    (buttons)
     Col dw 000Ah                ; Updates column positions (buttons)    
-    Update_Col db ?             ; Update display to left                  
+    Update_Col db ?             ; Update display to left  
     String_x db 4Ah             ; Every key registered will shift to left
     String_y db 03h             ; Constant Row 
 ; Button Variable ------------------------------------------------------------- 
@@ -28,9 +26,9 @@
     upperIn db ?                ; keys that stored in AH  
     Bool db ?                   ; Constraint checking
 ; String Variable -------------------------------------------------------------        
-    tempStr db 31 dup("$")      ; temporarily holds string
-    String db 31 dup("$")       ; accept keys           
-    inLimit dw 30d              ; limit for input, word size for 16 bit reg            
+    tempStr db 71 dup("$")      ; temporarily holds string
+    String db 71 dup("$")       ; accept keys           
+    inLimit dw 70d              ; limit for input, word size for 16 bit reg            
     inPtr dw ?                  ; input string pointer
 ; Error display ---------------------------------------------------------------
     Math_Err db "Math Error!$"
@@ -40,12 +38,14 @@
              db 186d, 4Dh dup(20h), 186d, 13, 10
              db 186d, 4Dh dup(20h), 186d, 13, 10
              db 186d, 4Dh dup(20h), 186d, 13, 10
-             db 200d, 4Dh dup(205d), 188d, 13, 10, 41h dup(20h), "Mode:$"     
+             db 200d, 4Dh dup(205d), 188d, 13, 10, 41h dup(20h), "Mode:$"
+    str0 db "Keyboard$"
+    str1 db "Mouse   $"                 
 ; View Textfile for button position -------------------------------------------    
     array_button dw 1F73h, 075Eh, 0001h, 011Bh, 326Dh
                  dw 1071h, 0001h, 0001h, 1265h, 0001h
                  dw 0001h, 2E63h, 0001h, 0E08h, 352Fh 
-                 dw 1970h, 0837h, 0938h, 0A39h, 092Ah
+                 dw 1970h, 0837h, 0938h, 0A39h, 2D78h
                  dw 0221h, 0534h, 0635h, 0736h, 0C2Dh          
                  dw 0001h, 0231h, 0332h, 0433h, 0D2Bh
                  dw 0A28h, 0B29h, 0B30h, 342Eh, 1C0Dh                   
@@ -72,8 +72,8 @@ sleep proc
     ;mov cx, 0fh        
     ;mov dx, 4240h 
 ; modified count ------------------------- SET TIMER HERE
-    mov cx, 2h          ; high order word  
-    mov dx, 2h          ; low word
+    mov cx, 1h          ; high order word  
+    mov dx, 1h          ; low word
     mov ah, 86h
     int 15h
     ret
@@ -150,13 +150,15 @@ clrEntry proc
     ret   
     
 clstr proc                                                                
-    mov cx, inLimit         ; soon change to mov cx, si, redo when si = 0 
+    mov cx, inPtr        
     xor di, di
     mov al, "$"
 t:     
     mov tempStr[di], al
-    inc di    
-    loop t    
+    inc di
+    jcxz out_t    
+    loop t   
+out_t:     
     ret            
  
 ; Mouse Cursor function ==================================================
@@ -296,9 +298,7 @@ L1:
     mov upperIn, ah             ; special input stored in AH
     mov input, al       
             
-L2:                        
-    mov ah, upperIn
-    mov al, input    
+L2:                           
     cmp ax, 0                   ; for mouse key to avoid key press
     jz L1              
     
@@ -315,10 +315,12 @@ L2:
     je MOUSE   
     
     cmp ax, array_button[6]
-    je EXT 
+    je EXT      
+    
+    ; call Math_Operators           ; separated function for all +-*/ sqrt 
        
     ; Enter button
-    ; cmp ax, array)button[70]
+    ; cmp ax, array_button[70]
     ; je goto asciihex function                             
     
     ; Clear Entry to reset position
@@ -347,7 +349,10 @@ BSPC:
     jmp L1  
     
 MOUSE:                                  
-    call _Cursor  
+    call _Cursor
+    mov ah, upperIn
+    mov al, input
+       
     jmp L2          
                                 
 EXT:      
@@ -363,15 +368,22 @@ _DetectKeys proc
     xor ax, ax                   
     mov al, input                   ; this AL input print without AH value     
     
-    mov bx, inPtr
-    cmp bx, 0
+    mov bx, inPtr                   ; number 0 can only type once in the front
+    cmp bx, 1                       ; check 2nd place
+    jne SKIP1
+    
+    mov ah, tempStr[0]
+    sub ax, 3030h
+    cmp ah, al                      ; check if second and first input is 0
+    jz OP_END
+    
+    cmp ah, 0                       ; if tempStr[0] is not 0 then no move pointer
     jnz SKIP1
     
-    sub ax, 30h
-    cmp ax, bx
-    jz OP_END                       ; check if first input is 0 
+    dec inPtr                       ; if the first is 0 followed with non 0 then                        
+    inc Update_Col
                      
-SKIP1:            
+SKIP1:           
     mov dh, String_y                ; row 4
     mov dl, Update_Col              ; column -1 each keys 
     call cursor          
@@ -399,7 +411,6 @@ _BackSpace proc
     mov si, inPtr 
     
     cld  
- 
     mov al, "$"             
     mov tempStr[si-1], al           ; replace current with $ 
                       
@@ -483,9 +494,7 @@ _onPress proc
     push cx             ; save cx and dx
     push dx             
 
-    ; this block is to fix color setting above so that
-    ; it display the blue color text while blinking  
-    ; set cursor so that it doesn't scroll the screen down...
+    ; set cursor so that it doesn't scroll the screen down
     mov dx, 0700h
     call cursor    
     lea dx, scanf
