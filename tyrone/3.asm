@@ -38,7 +38,7 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST        127 CHARACTERS LIMIT
-inList      DB  "(14356.278 + 53888.4) x 2s + (423 - 114) x (656 + 665) + 4^4 + 10000000", 56 DUP("$")
+inList      DB  "(14356.278 + 53888.4) x 16q + (423 - 114) x (656 + 665) + 4^4 + 10000000", 55 DUP("$")
 ; POSTFIX LIST      127 CHARACTERS LIMIT
 postList    DB  127 DUP("$")
 
@@ -62,8 +62,10 @@ tempNum     DW  0,0
 tempCX      DW  ?
 ; ------------------ (dpConvert) DECIMAL POINT CONVERTER, CONVERT 0 OR 1 DP TO 2 DP (RUN TWICE FOR 0DP to 2DP) ----------------------
 dpConv      DW  0,0
-                        
-                        
+
+; ----------- ERRORFLAG (AFTER EQUALS) ------------------
+errorFlag   DB  ?
+
 ;GENERAL VARIABLES
 num1 dw 0000H, 0000H
 num2 dw 0000H, 0000H
@@ -105,6 +107,12 @@ MAIN PROC
     CALL HEXTOASCII
     
     CALL ADDDOT
+    
+    CALL CLREG
+    
+    MOV AH,09H
+    LEA DX,asciiDot
+    INT 21H
 	
 	EXIT:		  
     MOV AX,4C00H
@@ -130,7 +138,12 @@ CLREG ENDP
 IN2POST PROC
     CALL CLREG
     
-    PUSH 40 ; PUSH INITIAL PARENTHESIS "("
+    XOR AX,AX
+    MOV AL,40
+    
+    PUSH AX ; PUSH INITIAL PARENTHESIS "("
+    
+    XOR AX,AX
     
     MOV SI,0
     MOV DI,0
@@ -142,7 +155,7 @@ IN2POST PROC
         CMP AX,36           ; $
         JE I2P_RIGHTP
         CMP AX,32           ; space
-        JE I2P_SKIP
+        JE E_I2P_SKIP
         CMP AX,40           ; (
         JE I2P_LEFTP        
         CMP AX,41           ; )
@@ -164,9 +177,16 @@ IN2POST PROC
         CMP AX,46           ; . (decimal dot)
         JE I2P_OPERAND
         CMP AX,48           ; operands
-        JB I2P_INVALID
+        JB E_I2P_INVALID
         CMP AX,57           ; operands
-        JA I2P_INVALID
+        JA E_I2P_INVALID
+        JMP I2P_OPERAND
+        
+        E_I2P_SKIP:
+            JMP I2P_SKIP
+            
+        E_I2P_INVALID:
+            JMP I2P_INVALID
         
         I2P_OPERAND:
         MOV BL,123          ; ADD OPERAND OPENING {
@@ -213,9 +233,12 @@ IN2POST PROC
             
             I2P_RIGHTPOUT:      ; IF ( THEN EXIT LOOP         
                 CMP AX,36       ; IF $ THEN EXIT MAIN LOOP
-                JE I2P_EXIT
+                JE E_I2P_EXIT
                 INC SI          ; FORWARD inList
                 JMP I2P_L1
+                
+                E_I2P_EXIT:
+                    JMP I2P_EXIT
                 
         I2P_OPERATOR:
             POP BX  
@@ -341,21 +364,28 @@ POSTOPS PROC
         MOV AL,postList[SI]                         
         
         CMP AX,36           ; $
-        JE PO_END
+        JE E_PO_END
         CMP AX,43           ; +
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,45           ; -
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,120          ; x
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,47           ; /
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,115          ; s (squared)
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,94           ; ^ (power)
-        JE PO_OPERATOR
+        JE E_PO_OPERATOR
         CMP AX,113          ; q (square root)
-        JE PO_OPERATOR    
+        JE E_PO_OPERATOR    
+        JMP PO_OPENING
+        
+        E_PO_END:
+            JMP PO_END
+        
+        E_PO_OPERATOR:
+            JMP PO_OPERATOR
         
         ; WILL MEET OPERAND OPENING {
         ; HENCE,
@@ -423,7 +453,7 @@ POSTOPS PROC
                 XOR DX,DX
                 MOV DL,dotTrigger
                 CMP DL,0            ; DETECTS MULTIPLE DOTS AND PROMPT ERROR
-                JA PO_ERROR
+                JA E_PO_ERROR
                 
                 MOV DX,1            ; DOT DETECTED
                 MOV dotTrigger,DL
@@ -433,6 +463,9 @@ POSTOPS PROC
                 INC SI              ; FORWARD postList
                 MOV postSI,SI
                 JMP PO_NUMBERS
+                
+                E_PO_ERROR:
+                    JMP PO_ERROR
                 
             PO_CLOSING:
                 ; TRANSFER TO asciiIn
@@ -470,7 +503,7 @@ POSTOPS PROC
                 CMP BL,2            ; 2 DP
                 JE PO_2DP
                 CMP BL,5            ; MORE THAN 5 DIGITS
-                JA PO_ERROR
+                JA E_PO_ERROR
                 
                 PO_xDP:             ; BETWEEN 3 TO 5 DIGITS
                     XOR CX,CX
@@ -552,8 +585,12 @@ POSTOPS PROC
             CMP AX,94           ; ^ (power)
             JE PO_POWER
             CMP AX,113          ; q (square root)
-            JE PO_SQRT
-           
+            JE E_PO_SQRT
+            JMP PO_ADDITION
+            
+            E_PO_SQRT:
+                JMP PO_SQRT
+            
             ; FROM HERE ON AX IS REPLACED BY OPERATOR FUNCTIONS
             
             PO_ADDITION:
@@ -587,7 +624,7 @@ POSTOPS PROC
                 MOV tempNum[2],BX
                 MOV BX,num2[0]
                 MOV num1[0],BX
-                MOV BX,num2[2],BX
+                MOV BX,num2[2]
                 MOV num1[2],BX
                 MOV BX,10000
                 MOV num2[2],BX
@@ -608,7 +645,7 @@ POSTOPS PROC
                 JMP PO_OPERATOROUT
                 
             PO_SQRT:
-                ;CALL sqrt
+                CALL sqrt
                 JMP PO_OPERATOROUT     
             
             PO_OPERATOROUT:
@@ -624,7 +661,7 @@ POSTOPS PROC
              
         
         PO_ERROR:
-            MOV SP,0
+            MOV SP,0 ; PENDING
             
         PO_END:
             POP AX              ; FINAL ANSWER
@@ -1301,23 +1338,43 @@ ret
 
 division ENDP
 
-;sqrt PROC
-;mov ax, num1[0]
-;mov bx, num1[2]
-;
-;mov word ptr int32, bx
-;mov word ptr int32 + 2, ax
-;
-;fild int32        ;load the integer to ST(0)
-;fsqrt             ;compute square root and store to ST(0)
-;fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
-;
-;mov ax, word ptr squareRoot
-;mov ans[2], ax
-;mov bx, 0
-;mov ans[0], bx
-;
-;ret
-;sqrt ENDP
+sqrt PROC
+
+;----CLEAR----
+xor ax, ax
+xor bx, bx
+mov word ptr int32, ax
+mov word ptr int32 + 2, ax
+mov word ptr squareRoot, ax
+mov word ptr squareRoot + 2, ax
+
+;---Initialization for squareRoot---
+mov ax, num1[0]
+mov bx, num1[2]
+
+mov word ptr int32, bx
+mov word ptr int32 + 2, ax
+
+fild int32        ;load the integer to ST(0)
+fsqrt             ;compute square root and store to ST(0)
+fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
+
+mov ax, word ptr squareRoot
+mov ans[2], ax
+mov bx, 0
+mov ans[0], bx
+
+;---Fix decimals---
+mov ax, ans[2]
+mov num1[0], bx
+mov num1[2], ax
+
+mov num2[0], bx
+mov num2[2], 10d
+
+call multiply
+
+ret
+sqrt ENDP
 
 END MAIN
