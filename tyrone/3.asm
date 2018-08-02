@@ -38,7 +38,7 @@ zeroPairs   DW  15258,51712,1525,57600,152,38528,15,16960,1,34464,0,10000,0,1000
 
 ; ------------------ (IN2POST) INFIX TO POSTFIX ---------------
 ; INFIX LIST        127 CHARACTERS LIMIT
-inList      DB  "(14356.278 + 53888.4) x 16q + (423 - 114) x (656 + 665) + 4^4 + 10000000", 55 DUP("$")
+inList      DB  "4", 126 DUP("$")
 ; POSTFIX LIST      127 CHARACTERS LIMIT
 postList    DB  127 DUP("$")
 
@@ -645,7 +645,7 @@ POSTOPS PROC
                 JMP PO_OPERATOROUT
                 
             PO_SQRT:
-                CALL sqrt
+;                CALL sqrt
                 JMP PO_OPERATOROUT     
             
             PO_OPERATOROUT:
@@ -973,7 +973,13 @@ ADDDOT PROC
         INC CX                  ; ADDS SPACE FOR DECIMAL DOT
         MOV BX,CX
         SUB BX,3                ; HOLDS POSITION OF DECIMAL DOT
-        MOV SI,0
+        CMP BX,0
+        JGE AD_CONTINUE11       
+        
+        MOV BX,0                ; SPECIAL CASE, 0.0x
+        
+        AD_CONTINUE11:
+            MOV SI,0
         AD_TRANSFER:
             CMP SI,BX
             JE AD_DOT
@@ -984,6 +990,20 @@ ADDDOT PROC
         
         AD_DOT:
             MOV DL,hexAscii[SI+1]
+            CMP DL,36           ; SPECIAL CASE, 0.0x
+            JNE AD_CONTINUE12
+            
+            MOV DL,46           ; ADD DOT
+            MOV asciiDot[SI],DL
+            MOV DL,48
+            MOV asciiDot[SI+1],DL   ; ADD 0
+            MOV AL,hexAscii[SI]
+            INC SI
+            MOV asciiDot[SI+1],AL
+            JMP AD_CONTINUE2
+            
+        AD_CONTINUE12:
+            
             CMP DL,48           ; COMPARE LAST DIGIT WITH 0
             JNE AD_2D           ; IF NOT 0, THEN IS 2 DECIMAL
             MOV DL,hexAscii[SI]
@@ -1008,15 +1028,43 @@ ADDDOT PROC
                 MOV AL,hexAscii[SI]
                 INC SI
                 MOV asciiDot[SI],AL
-                JMP AD_CONTINUE2
-            
-;                AD_0D:
-;                MOV AL,hexAscii[SI]
-;                MOV asciiDOt[SI],AL    
+                JMP AD_CONTINUE2       
             
         AD_CONTINUE2:
             CALL CLREG
             
+            MOV AL,asciiDot[0]
+            CMP AX,46           ; IF DOT IS FIRST CHARACTER
+            JNE AD_EXIT
+            
+            XOR SI,SI
+            XOR AX,AX
+            AD_CHECKASCIIDOT:
+                MOV AL,asciiDot[SI]
+                CMP AX,36
+                JE AD_CONTINUE4
+                
+                INC SI
+                JMP AD_CHECKASCIIDOT
+            
+            AD_CONTINUE4:
+                
+                MOV AL,asciiDot[SI-1]
+                MOV asciiDot[SI],AL
+                
+                CMP SI,1
+                JE AD_ZERODOT
+                
+                DEC SI
+                JMP AD_CONTINUE4
+            
+            AD_ZERODOT:
+                XOR AX,AX
+                MOV AL,48       ; ADD 0 TO FIRST CHARACTER
+                MOV asciiDot[0],48         
+                    
+        AD_EXIT:    
+            CALL CLREG
             RET
             
 ADDDOT ENDP
@@ -1338,43 +1386,43 @@ ret
 
 division ENDP
 
-sqrt PROC
-
-;----CLEAR----
-xor ax, ax
-xor bx, bx
-mov word ptr int32, ax
-mov word ptr int32 + 2, ax
-mov word ptr squareRoot, ax
-mov word ptr squareRoot + 2, ax
-
-;---Initialization for squareRoot---
-mov ax, num1[0]
-mov bx, num1[2]
-
-mov word ptr int32, bx
-mov word ptr int32 + 2, ax
-
-fild int32        ;load the integer to ST(0)
-fsqrt             ;compute square root and store to ST(0)
-fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
-
-mov ax, word ptr squareRoot
-mov ans[2], ax
-mov bx, 0
-mov ans[0], bx
-
-;---Fix decimals---
-mov ax, ans[2]
-mov num1[0], bx
-mov num1[2], ax
-
-mov num2[0], bx
-mov num2[2], 10d
-
-call multiply
-
-ret
-sqrt ENDP
+;sqrt PROC
+;
+;;----CLEAR----
+;xor ax, ax
+;xor bx, bx
+;mov word ptr int32, ax
+;mov word ptr int32 + 2, ax
+;mov word ptr squareRoot, ax
+;mov word ptr squareRoot + 2, ax
+;
+;;---Initialization for squareRoot---
+;mov ax, num1[0]
+;mov bx, num1[2]
+;
+;mov word ptr int32, bx
+;mov word ptr int32 + 2, ax
+;
+;fild int32        ;load the integer to ST(0)
+;fsqrt             ;compute square root and store to ST(0)
+;fistp squareRoot  ;store the result in memory (as a 32-bit integer) and pop ST(0)
+;
+;mov ax, word ptr squareRoot
+;mov ans[2], ax
+;mov bx, 0
+;mov ans[0], bx
+;
+;;---Fix decimals---
+;mov ax, ans[2]
+;mov num1[0], bx
+;mov num1[2], ax
+;
+;mov num2[0], bx
+;mov num2[2], 10d
+;
+;call multiply
+;
+;ret
+;sqrt ENDP
 
 END MAIN
