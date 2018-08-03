@@ -259,15 +259,20 @@ MAIN ENDP
 ; ============================ UI-OPERATION BRIDGE ===============================
 UIMERGE PROC
 
+    XOR CX,CX
     XOR BX,BX
     XOR DI,DI
-
+             
+    MOV CX,70
+             
     MERGE_INTRANSFER:    ; TRANSFER String TO inList
-        MOV BL,String[DI]
+        MOV BL,tempStr[DI]                                  ; TEMPORARY TESTING
         MOV inList[DI],BL
         INC DI
         LOOP MERGE_INTRANSFER
-
+    
+    CALL CLREG
+    
     CALL IN2POST
 	
 	CALL POSTOPS
@@ -277,6 +282,11 @@ UIMERGE PROC
     CALL ADDDOT
     
     CALL CLREG
+    
+    mov dh, String_y
+    mov dl, String_x
+    inc dh
+    call cursor
     
     MOV AH,09H
     LEA DX,asciiDot
@@ -2123,10 +2133,14 @@ L2:
     call _KeyPress   
     
     test Bool, 1                ; if 1 then true else no
-    jz L1
-                         
+    jz L1      
+    
     mov ah, upperIn
     mov al, input 
+    
+    ; Enter button 
+    cmp ax, array_button[68]
+    je ENTERED
                  
     cmp ax, array_button[8]
     je MOUSE   
@@ -2150,9 +2164,6 @@ L2:
                  
     call _DetectKeys    
            
-    ; Enter button
-    ; cmp ax, array_button[70]
-    ; je ENTERED
     
     loop L1        
     
@@ -2173,7 +2184,7 @@ MOUSE:
     jmp L2   
 
 ENTERED:
-
+    and input, 0
     CALL UIMERGE
     
     jmp L1
