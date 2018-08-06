@@ -209,11 +209,14 @@ squareRoot dw ?
     Bool db ?                   ; Constraint checking
 ; String Variable -------------------------------------------------------------        
     tempStr db 71 dup("$")      ; temporarily holds string
-    String db 71 dup("$")       ; accept keys           
-    inLimit dw 70d              ; limit for input, word size for 16 bit reg            
+    String db 101 dup("$")      ; accept keys           
+    inLimit dw 70d              ; limit for input, word size for 16 bit reg
+    ; Pointer            
     inPtr dw ?                  ; input string pointer     
-    tPtr db ?                   ; pointer that indicates length of a term
+    tPtr db ?                   ; pointer that indicates length of a term 
+    ; Bool
     DigitF db ?                 ; bool variable for checking zero as front digit
+    opF db ?                    ; number of operand typed only once per term
 ; Error display ---------------------------------------------------------------
     Math_Err db "Math Error!$"
     Syntax_Err db "Syntax Error!$"  
@@ -237,6 +240,8 @@ squareRoot dw ?
     ; BH = 8F, 80h causes blinking screen
     ; 25 row and 80 column max 
     ; max cursor range cx: column 027Fh dx: row 0C7h
+    
+    ; FACTORIAL, M+, SIN, COS, TAN
 
 .CODE
 MAIN PROC
@@ -281,8 +286,7 @@ UIMERGE PROC
     CALL HEXTOASCII
     
     CALL ADDDOT
- 
-    std       
+        
     xor si, si                                    
 LEN:      
     mov al, asciiDot[si]
@@ -1907,8 +1911,7 @@ _logo proc ;------------------- PRINT LOGO (1 PAGE) >>> Press any key >>> cls
     
     
     RET
-_logo ENDP
-
+_logo ENDP    
 ; ================================= UI ===========================================================
 
 ; TINY FUNCTIONS ==============================================
@@ -1970,16 +1973,16 @@ clrEntry proc
     call bgcolor                
  
     xor cx, cx 
-    mov dx, 0700h           ; display buttons   
+    mov dx, 0700h               ; display buttons   
     call cursor
     
     lea dx, scanf    
     call print  
     
-    mov dh, String_y        ; constant row
-    mov dl, String_x        ; constant column 
+    mov dh, String_y            ; constant row
+    mov dl, String_x            ; constant column 
     
-    mov Update_Col, dl      ; reset    
+    mov Update_Col, dl          ; reset    
        
     call cursor 
     
@@ -1993,7 +1996,8 @@ clrEntry proc
     ; clear input buffer       
     mov inPtr, si            
     and tPtr, 0
-    and DigitF, 0
+    and DigitF, 0  
+    and opF, 0
           
     ret   
     
@@ -2043,26 +2047,26 @@ _Cursor proc
     jmp no_button  
     
 left_button:  
-    mov ax, dx                      ; ax has row coord
-    mov bx, cx                      ; bx has col coord  
+    mov ax, dx                          ; ax has row coord
+    mov bx, cx                          ; bx has col coord  
 
     xor cx, cx
     xor dx, dx 
     xor si, si
            
-    mov cl, start_Row               ; upper row      3F19h
-    mov dl, end_Row                 ; lower row                            
+    mov cl, start_Row                   ; upper row      3F19h
+    mov dl, end_Row                     ; lower row                            
 Outer_Loop:    
-    push cx                         ; save upper row coord
-    push dx                         ; save lower row coord  
+    push cx                             ; save upper row coord
+    push dx                             ; save lower row coord  
     
-    cmp ax, cx                      ; compare if it's in current row 
+    cmp ax, cx                          ; compare if it's in current row 
     jb break_1             
     cmp ax, dx
     ja break_1       
     
-    mov cx, start_Col               ; upper Col
-    mov dx, end_Col                 ; lower Col
+    mov cx, start_Col                   ; upper Col
+    mov dx, end_Col                     ; lower Col
     
     Inner_Loop:                                              
         cmp bx, cx                      ; Upper Col: bl < cl then out
@@ -2087,31 +2091,31 @@ break_1:
     add cx, 0010h                       ; upper row to next row
     add dx, 0010h                       ; lower row to next row
     
-    cmp dx, 00B7h                      ; compare lower row to maximum depth
+    cmp dx, 00B7h                       ; compare lower row to maximum depth
     jne Outer_Loop 
     
     xor ax, ax
     jmp no_button                       ; no button scanned then out
     
 operation:  
-    pop dx                            ; avoid stack having previous values
-    pop dx                            ; clear, This     
+    pop dx                              ; avoid stack having previous values
+    pop dx                              ; clear, This     
     mov ax, array_button[si]   
        
-    cmp ax, array_button[8]           ; Switch mode
-    jne no_button                     ; if ax = "m", no jump
-                      
+    cmp ax, array_button[8]             ; Switch mode
+    jne no_button                       ; if ax = "m", no jump
+                                        
 right_button:                          
     mov ax, array_button[8]
     call _KeyPress             
-    dec Mode                      ; Mode = 0, Keyboard mode  
+    dec Mode                            ; Mode = 0, Keyboard mode  
     
-    mov ax, 2                      ; hide cursor 
+    mov ax, 2                           ; hide cursor 
     int 33h    
     
     xor ax, ax      
 no_button:   
-    mov upperIn, ah
+    mov upperIn, ah                     ; clear both avoid auto assign 
     mov Input, al  
     
     ret
@@ -2154,7 +2158,9 @@ L2:
     call _KeyPress   
     
     test Bool, 1                ; if 1 then true else no
-    jz L1      
+    jz L1         
+    
+    ;call Math_Operators           ; separated function for all +-*/ sqrt
     
     mov ah, upperIn
     mov al, input 
@@ -2167,9 +2173,7 @@ L2:
     je MOUSE   
     
     cmp ax, array_button[6]
-    je EXT      
-    
-    ; call Math_Operators           ; separated function for all +-*/ sqrt                             
+    je EXT                                   
     
     ; Clear Entry to reset position
     cmp ax, array_button[22]     
@@ -2216,7 +2220,40 @@ EXT:
 _Calculator endp    
 
    
-; FUNCTIONS =================================================== 
+; FUNCTIONS ===================================================
+Math_Operators proc
+    mov al, input
+    mov ah, upperIn
+        
+    cmp ax, array_button[0]
+    ;je wrSqr
+    cmp ax, array_button[2]
+    ;je wePow
+    ;cmp ax, array_button[4]                     ; HAS NO KEY YET
+    ;je NOKEYREG
+    cmp ax, array_button[10]
+    ;je wrSqrt
+    ;cmp ax, array_button[12]                   ; 10^x ADD HERE IF HAS TIME
+    ;je wrBaseTen
+    cmp ax, array_button[14]
+    ;je wrLog
+    cmp ax, array_button[16]
+    ;je wrExp
+    ;cmp ax, array_button[18]                       ; MOD NOT SUPPORTED YET?
+    ;je wrMod               
+    cmp ax, array_button[20]
+    ;je wrInv       
+    cmp ax, array_button[30]
+    ;je wrPi
+    cmp ax, array_button[40]
+    ;je wrFact
+    ;cmp ax, array_button[50]                     ; PROBABLY REMOVE NEGATIVE NOT SUPPORTED
+    ;je wrNeg           
+    
+NOKEYREG:    
+    ret
+Math_Operators endp 
+;----------------------------------------------------------------
 _DetectKeys proc
     ; This function get keys from keyboard to temporarily save into var
     xor ax, ax                   
@@ -2225,8 +2262,6 @@ _DetectKeys proc
     mov si, inPtr 
  
     call _Constraint
-    
-    inc tPtr                        ; update pointer
     
     mov dh, String_y                ; row 4
     mov dl, Update_Col              ; column -1 each keys 
@@ -2271,23 +2306,41 @@ _BackSpace proc
     call cursor         
      
     lea dx, tempStr                 ; display remaining string
-    call print           
+    call print  
     
-    ; term--
-    ; if term == 0
-    ;    set DigitF = 0
-    ; if term >= 1
-    ;    set DigitF = 1    
-    and DigitF, 0
+    mov si, inPtr      
+    ;-----------------------------------------
+    mov al, tempStr[si-1] 
     
-    dec tPtr
+    cmp al, "."
+    je SETF    
+    cmp al, "("
+    je SETF
+    cmp al, ")"
+    je SETF
+    
+    sub al, 30h    
+    cmp al, 0
+    jl NOTNUM
+    cmp al, 9
+    jg NOTNUM 
+      
+    ; if pointer > 0, set flag, decrease tPtr
     cmp tPtr, 0
-    jge NO_SET
+    ja SETF
+        
+    NOTNUM:           
+        ; else no set and exit, tPtr == 0
+        and opF, 0      
+        and DigitF, 0 
+        
+        jmp OUTC2 
     
-    and tPtr, 0 
-    or DigitF, 1
-    
-NO_SET:        
+SETF:    
+    or DigitF, 1     
+    dec tPtr
+    ;-----------------------------------------                                  
+OUTC2:    
     cmp inPtr, 0                    
     jne NO_BSPC
              
@@ -2377,53 +2430,66 @@ _Constraint proc
                             
     ; if AL == 1 ~ 9
     cmp al, "."
-    je DECIMAL        
+    je NOTZ
+    cmp al, "("
+    je NOINC
+    cmp al, ")"
+    je NOFLAG
+            
     sub al, 30h                 ; al < 0 skip flag
     cmp al, 0
     jb NOTINT
     cmp al, 9                   ; al > 9 skip flag
-    ja NOTINT                                 
-            
-    DECIMAL:    
+    ja NOTINT                             
+                
         ; if digitF = 1: skip bottom one                                                       
         cmp DigitF, 1                   ; 10000 is valid until user press + - ...
-        je END_CHECK                    ; DigitF : 0 = new term, 1 = continuous number
+        je SAVEVAR                    ; DigitF : 0 = new term, 1 = continuous number
 
-; ACCESSIBLE AFTER AFTER SCANNING NOT NUMBERS        
         ; if term >= 1
         cmp tPtr, 1
-        jb PTRZERO
-        ; if number before AL != 0
+        jb PTRZERO                 
+            ; if number before AL != 0
             cmp tempStr[si-1], "0"
             jne NOTZ
             
-            ; if AL == 0 
-            cmp al, 0
-            jnz NOTZ 
-            
-                dec tPtr                  
-                dec inPtr                
-                                                                                 
-                inc Update_Col          ; for later use 
+            inc Update_Col          ; call cursor
+            dec tPtr                ; tPtr--  
+            dec inPtr               ; inPtr = 0       
+                ; if AL == 0 
+                cmp al, 0
+                jnz NOTZ  
+                    
                 and DigitF, 0
                 
-                jmp END_CHECK 
-            ; term == 0     
-            PTRZERO:   
-                cmp al, 0
-                jz END_CHECK                       
-                    
-            NOTZ:                                                                  
-                or DigitF, 1                ; set flag                                
-    jmp END_CHECK       
-    ; if AL is an operand, reset term and pointer           
-                                                  
-NOTINT:  
-    and DigitF, 0               ; operand detected set term to 0
-    and tPtr, 0
-    dec tPtr                    ; for later use
+                jmp SAVEVAR 
+        ; term == 0     
+        PTRZERO:   
+            cmp al, 0
+            jz SAVEVAR
+                   
+        NOTZ:                                                                  
+            or DigitF, 1                ; set flag                                               
+    SAVEVAR:
+        inc tPtr 
         
-END_CHECK:    
+    NOINC:
+        and opF, 0            ; no spam operand more than 1       
+                             
+    jmp OUTC                   
+; if AL is an operand, reset term and pointer                                                   
+NOTINT:      
+    inc opF
+    
+NOFLAG:         
+    and DigitF, 0               ; operand detected set term to 0 
+    and tPtr, 0                 ; set to 0   
+    
+    cmp opF, 1
+    jbe OUTC
+    
+    pop dx                      ; pop return address, exit backspace     
+OUTC:      
     ret    
 _Constraint endp
 ;----------------------------------------------------------------
