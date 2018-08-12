@@ -314,7 +314,7 @@ LEN:
     
     CALL CLREG 
     
-    cmp Mode, 1               ; FIX PROBLEM ERHERE  
+    cmp Mode, 0               ; FIX PROBLEM ERHERE  
     jz KeyB
 
 Buffering:
@@ -2134,8 +2134,10 @@ clrEntry proc
     mov StringPtr, si
                 
     and tPtr, 0
-    and DigitF, 0  
-    or opF, 1
+    and DigitF, 0
+    
+    mov al, 1  
+    mov opF, al
           
     ret   
     
@@ -2362,7 +2364,7 @@ _Calculator endp
 ; FUNCTIONS ===================================================
 Math_Operators proc
     mov al, input
-    mov ah, upperIn
+    mov ah, upperIn 
     ;----------------------------------------------------------------------    
     cmp ax, array_button[0]
     jne nextButton1
@@ -2427,7 +2429,7 @@ nextButton3:
     ;----------------------------------------------------------------------
     ; No key match above only go bytekeys label
     mov al, Input                        
-    mov si, inPtr   
+    mov si, inPtr 
 ByteKeys:                           ; print for display                
     mov tempStr[si], al             ; write into temp string    
     inc inPtr                                            
@@ -2450,7 +2452,6 @@ _DetectKeys proc
     xor ax, ax                   
     mov al, input                   ; this AL input print without AH value    
  
-    ;mov si, inPtr 
     mov si, StringPtr
  
     call _Constraint
@@ -2524,8 +2525,8 @@ HAS_BSPC:
     cmp al, 9
     jg NOTNUM                   ; to filter search only numbers 
     
-    cmp inPtr, 0
-    jz SETPF
+    cmp StringPtr, 0
+    ja SETF
       
     ; if pointer > 0, set flag, decrease tPtr
     cmp tPtr, 0
@@ -2533,28 +2534,29 @@ HAS_BSPC:
         
     NOTNUM:           
         ; else no set and exit, tPtr == 0
-        and opF, 0      
-        and DigitF, 0 
-        
-        jmp OUTC2   
-        
-    DECPTR:
-        dec tPtr
-        jmp NOTNUM
-             
-    SETPF:
         mov al, 1
         mov opF, al
-        jmp OUTC2
-         
-        INNERBRAC:                      ; if (0. then set digitF, 0
-            mov bl, "("
-            cmp bl, String[si-2]       ; else it is 10, 100, 1000 ..
-            je NOTNUM            
+        
+        SETDF:             
+            and DigitF, 0 
             
-SETF:    
+            jmp OUTC2                                 
+            
+        DECPTR:
+            dec tPtr
+            jmp SETDF
+             
+            INNERBRAC:                      ; if (0. then set digitF, 0
+                mov bl, "("
+                cmp bl, String[si-2]       ; else it is 10, 100, 1000 ..
+                je SETDF        
+                
+SETF:           
     or DigitF, 1     
     dec tPtr    
+    
+    cmp si, 1
+    jz SETDF
                                       
 OUTC2:     
     ;-----------------------------------------
@@ -2676,7 +2678,9 @@ _Constraint proc
             
             inc Update_Col          ; call cursor
             dec tPtr                ; tPtr--  
-            dec inPtr               ; inPtr = 0       
+            dec inPtr               ; inPtr = 0
+            dec StringPtr                       
+            
                 ; if AL == 0 
                 cmp al, 0
                 jnz NOTZ  
@@ -2699,17 +2703,22 @@ _Constraint proc
                              
     jmp OUTC                   
 ; if AL is an operand, reset term and pointer                                                   
-NOTINT:          
-    or opF, 1
+NOTINT:                                      
+    cmp opF, 0
+    jz NOPOPDX
+    
+    pop dx                      ; pop return address, exit backspace
+    jmp OUTC
+    
+    NOPOPDX:
+        mov al, 1
+        mov opF, al              ; opF will turn 1 after 
     
 NOFLAG:         
     and DigitF, 0               ; operand detected set term to 0 
-    and tPtr, 0                 ; set to 0   
-    
-    cmp opF, 1
-    je OUTC
-    
-    pop dx                      ; pop return address, exit backspace     
+    and tPtr, 0                 ; set to 0
+    and opF, 1                  
+         
 OUTC:      
     ret    
 _Constraint endp
