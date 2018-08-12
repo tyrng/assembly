@@ -1,14 +1,14 @@
-      x^2       x^y        M+       ESC     ChgMode
+      x^2       x^y       log       ESC     ChgMode
  
-    sqrt(x)    10^x       log       e^x       Mod
+    sqrt(x)    10^x      sin(x)    cos(x)    Record
 
-      1/x       CE         C        Bspc       /
+      1/x       CE        f(x)      Bspc       /
 
-      pi         7         8         9         x
+       e         7         8         9         x
 
-      n!         4         5         6         -
+      pi         4         5         6         -
 
-      +/-        1         2         3         +
+      n!         1         2         3         +
  
        (         )         0         .         =
  
