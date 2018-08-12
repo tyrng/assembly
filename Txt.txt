@@ -1,10 +1,10 @@
       x^2       x^y       log       ESC     ChgMode
  
-    sqrt(x)    sin(x)    cos(x)    tan(x)   History
+    sqrt(x)    10^x      sin(x)    cos(x)    Record
 
       1/x       CE        f(x)      Bspc       /
 
-      e          7         8         9         x
+       e         7         8         9         x
 
       pi         4         5         6         -
 

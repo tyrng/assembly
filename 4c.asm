@@ -183,8 +183,7 @@ squareRoot dw ?
 ; ================================ UI VARIABLES =========================================
 ; =======================================================================================
 ; Share variable --------------------------------------------------------------
-    e db "2.718"                ; value of exp 
-    pi db "3.142"               ; value of pi
+    e db "2.71828"              ; value of exp
 ; Mouse Variables -------------------------------------------------------------
     Mode db 0                   ; 0 - keyboard, 1 - mouse          
     ; constant for dx
@@ -232,12 +231,12 @@ squareRoot dw ?
     str0 db "Keyboard$"
     str1 db "Mouse   $"                 
 ; View Textfile for button position -------------------------------------------    
-    array_button dw 1F73h, 075Eh, 264Ch, 011Bh, 326Dh
-                 dw 1071h, 1F53h, 2E43h, 1454h, 2348h
-                 dw 1749h, 2E63h, 2247h, 0E08h, 352Fh 
-                 dw 1265h, 0837h, 0938h, 0A39h, 2D78h
-                 dw 1970h, 0534h, 0635h, 0736h, 0C2Dh          
-                 dw 0221h, 0231h, 0332h, 0433h, 0D2Bh
+    array_button dw 1F73h, 075Eh, 0001h, 011Bh, 326Dh
+                 dw 1071h, 0001h, 0001h, 1265h, 0001h
+                 dw 0001h, 2E63h, 0001h, 0E08h, 352Fh 
+                 dw 1970h, 0837h, 0938h, 0A39h, 2D78h
+                 dw 0221h, 0534h, 0635h, 0736h, 0C2Dh          
+                 dw 0001h, 0231h, 0332h, 0433h, 0D2Bh
                  dw 0A28h, 0B29h, 0B30h, 342Eh, 1C0Dh                   
 
     ; BH = 8F, 80h causes blinking screen
@@ -844,7 +843,7 @@ POSTOPS PROC
                 MOV CX,11
                 XOR DI,DI
                 XOR DX,DX
-                               0
+                
                 PO_TRANSFERSTR1:    ; TRANSFER tempOpStr TO asciiIn
                     MOV BL,tempOpStr[DI]
                     MOV asciiIn[DI],BL
@@ -1188,7 +1187,7 @@ call multiply
 xor dx,dx
 mov dl,errorFlag
 cmp dl,0
-jne dp_error                  
+jne dp_error
 
 mov ax, ans[0]
 mov bx, ans[2]
@@ -1983,11 +1982,18 @@ o_cls proc
     mov ax, 0600h
     xor cx, cx
     mov dx, 184Fh       ;end coord
-    mov bh, 3Ah         ;cyan bg, green text
+    mov bh, 0Ah         ;cyan bg, green text
     int 10h    
 
     ret
 o_cls endp
+
+o_print proc  
+    mov ah, 9
+    int 21h    
+    xor dx,dx       
+    ret
+o_print endp
 
 _logo proc ;------------------- PRINT LOGO (1 PAGE) >>> Press any key >>> cls
  
@@ -1999,29 +2005,29 @@ _logo proc ;------------------- PRINT LOGO (1 PAGE) >>> Press any key >>> cls
 ;-------------------- PRINT LOGO
 
  LEA DX,logo01
- CALL print
+ CALL o_print
  LEA DX,logo02
- CALL print
+ CALL o_print
  LEA DX,logo03
- CALL print
+ CALL o_print
  LEA DX,logo04
- CALL print
+ CALL o_print
  LEA DX,logo05
- CALL print 
+ CALL o_print 
  LEA DX,logo06
- CALL print 
+ CALL o_print 
  LEA DX,logo07
- CALL print 
+ CALL o_print 
  LEA DX,logo08
- CALL print
+ CALL o_print
  LEA DX,logo09
- CALL print 
+ CALL o_print 
  LEA DX,logo10
- CALL print 
+ CALL o_print 
  LEA DX,logo11
- CALL print 
+ CALL o_print 
  LEA DX,logo12
- CALL print 
+ CALL o_print 
  
 ;-------------------- END PRINT LOGO
  
@@ -2035,53 +2041,7 @@ _logo proc ;------------------- PRINT LOGO (1 PAGE) >>> Press any key >>> cls
 _logo ENDP
 ; ========================== SPECIAL FUNCTION ======================================== 
 sine proc
-    ;x/1!-x^3/3!+x^5/5!-x^7/7!+x^9/9!
-
-; NO DECIMAL SUPPORT YET.
-; DECIMAL SUPPORT REQUIRES MORE WORK (TO CALCULATE DECIMAL POINT)
-; USE THIS FOR TESTING FIRST
-
-; TO CONVERT STRING TO HEX
-; ASK FOR OPERAND 1
-; PARAMETER : asciiIn (use loop to pass to string)
-; USE ASCIITOHEX FUNCTION
-; RETURN asciiHex (returns array of 2 words)
-
-
-; TRANSFER TO NUM1
-    MOV BX,asciiHex[0]
-    MOV num1[0],BX
-    MOV BX,asciiHex[2]
-    MOV num1[2],BX
-
-; CONVERT STRING TO HEX AGAIN
-; ASK FOR OPERAND 2
-; PARAMETER : asciiIn (use loop to pass to string)
-; USE ASCIITOHEX FUNCTION
-; RETURN asciiHex (returns array of 2 words)
-
-; TRANSFER TO NUM2
-
-    MOV BX,asciiHex[0]
-    MOV num2[0],BX
-    MOV BX,asciiHex[2]
-    MOV num2[2],BX
-
-; CALL DIVISION
-    XOR BX,BX
-    CALL division
-
-; CONVERT TO STRING AGAIN
-
-	MOV BX,ans[0]
-	MOV hexIn[0],BX
-	MOV BX,ans[2]
-	MOV hexIn[2],BX
-
-	CALL HEXTOASCII
-
-; RESULT IS NOW IN hexAscii (A STRING)
-
+    
     ret
 sine endp
 
@@ -2096,8 +2056,8 @@ sleep proc
     ;mov cx, 0fh        
     ;mov dx, 4240h 
 ; modified count ------------------------- SET TIMER HERE
-    mov cx, 2h          ; high order word  
-    mov dx, 2h          ; low word
+    mov cx, 1h          ; high order word  
+    mov dx, 1h          ; low word
     mov ah, 86h
     int 15h
     ret
@@ -2176,8 +2136,8 @@ clrEntry proc
     and tPtr, 0
     and DigitF, 0
     
-    and opF, 0
-    inc opF
+    mov al, 1  
+    mov opF, al
           
     ret   
     
@@ -2358,26 +2318,33 @@ L2:
     je CL_ENTRY           
     
     cmp ax, array_button[26]
-    je BSPC
-    
-    cmp ax, array_button[18]
-    ;je Records
-    cmp ax, array_button[24]
-    ;je Graph
+    je BSPC        
     
     ; maximum size of 30 
-    mov si, inPtr                       ;StringPtr
+    mov si, inPtr
     cmp si, inLimit     
-    jge L1         
-    mov di, StringPtr
-    cmp di, 101
-    jge L1        
+    jge L1                 
                  
     call _DetectKeys    
               
     jmp L1        
   
-; Jump to function 
+; Jump to function
+CL_ENTRY:
+    call clrEntry 
+    jmp L1
+
+BSPC:
+    call _BackSpace 
+    jmp L1  
+    
+MOUSE:                                  
+    call _Cursor
+    mov ah, upperIn
+    mov al, input
+       
+    jmp L2   
+
 ENTERED:        
     cmp inPtr, 0
     jz noEnter
@@ -2387,21 +2354,6 @@ ENTERED:
     
 noEnter:
     jmp L1
-    
-MOUSE:                                  
-    call _Cursor
-    mov ah, upperIn
-    mov al, input
-       
-    jmp L2    
-    
-CL_ENTRY:
-    call clrEntry 
-    jmp L1
-
-BSPC:
-    call _BackSpace 
-    jmp L1     
                                 
 EXT:      
     mov ax, 2
@@ -2424,16 +2376,18 @@ Math_Operators proc
     ;----------------------------------------------------------------------
 nextButton1:    
     ;cmp ax, array_button[4]                     ; HAS NO KEY YET
-    jne nextButton2
+    ;je NOKEYREG
+    ;jmp NOKEYREG
     
-    ; Log
 nextButton2:      
     cmp ax, array_button[10]
     jne nextButton3  
-                     
+             
+    cld
+                
     mov si, inPtr 
-    xor bx, bx
-    mov cx, 1              
+    xor bx, bx             
+    
     isDigit:                                ; check for operand
         mov bl, tempStr[si-1]                                    
         mov tempStr[si], bl                 ; tempStr[si+1] = tempStr[si]
@@ -2442,8 +2396,7 @@ nextButton2:
           
         cmp si, 0                           ; if inPtr is 1-- = 0 then out
         je noRep       
-              
-        jcxz noRep             
+        
         dec si                              ; update index                                                           
         
         ; if isDigit            
@@ -2451,8 +2404,6 @@ nextButton2:
         jae isDigit
         cmp bl, 9   
         jbe isDigit
-        
-        loop isDigit
 noRep:  
     ;else print q
     mov al, 251                             ; al = ascii sqrt
@@ -2461,115 +2412,18 @@ noRep:
     
     ;----------------------------------------------------------------------
 nextButton3: 
-    cmp ax, array_button[12]               
-    jne nextButton4
-    
-    ; Sine 
-nextButton4: 
+   
+    ;cmp ax, array_button[12]                   ; 10^x ADD HERE IF HAS TIME
+    ;je wrBaseTen
     cmp ax, array_button[14]
-    jne nextButton5 
-    
-    ; Cosine
-nextButton5:    
+    ;je wrLog
     cmp ax, array_button[16]
-    jne nextButton6
-
-    ; Tangent
-nextButton6:                             
+    ;je wrExp              
     cmp ax, array_button[20]
-    jne nextButton7
-    
-    mov si, inPtr   
-    mov di, StringPtr
-    mov cx, 2 
-    
-    xor bx, bx              
-    isDigit2:                               ; check for operand
-        mov bl, tempStr[si-1]                        
-        mov bl, String[di-1]    
-                
-        mov tempStr[si+1], bl               ; tempStr[si+2] = tempStr[si]
-        mov String[di+1], bl
-        
-        sub bl, 30h
-          
-        cmp si, 0                           ; if inPtr is 1-- = 0 then out
-        je noRep2                               
-        
-        jcxz noRep2
-                                        
-        dec si                              ; update index
-        dec di                                                               
-        ; if isDigit            
-        cmp bl, 0                       
-        jae isDigit2
-        cmp bl, 9   
-        jbe isDigit2
-        
-        loop isDigit2
-noRep2:                  
-    mov bl, "1"
-    mov tempStr[si], bl
-    mov String[di], bl
-    
-    mov bl, "/"
-    mov tempStr[si+1], bl
-    mov String[di+1], bl
-    
-    mov bx, 2
-    add inPtr, bx
-    add StringPtr, bx
-    
-    dec Update_Col
-
-    jmp NOKEYREG
-    
-nextButton7:                                ; 2.718
+    ;je wrInv       
     cmp ax, array_button[30]
-    jne nextButton8
+    ;je wrPi
     
-    mov si, inPtr
-    mov tempStr[si], al
-    inc inPtr
-    
-    mov di, StringPtr 
-    xor si, si
-    wrExp:
-        mov al, e[si]
-        mov String[di], al
-        inc StringPtr
-        
-        inc di
-        inc si        
-        cmp si, 4
-        jne wrExp
-        
-    jmp NOKEYREG 
-    
-nextButton8:   
-    cmp ax, array_button[40]                ; 3.14
-    jne nextButton9
-    
-    mov si, inPtr
-    mov al, 227
-    mov tempStr[si], al
-    inc inPtr
-    
-    mov di, StringPtr 
-    xor si, si
-    wrPi:
-        mov al, pi[si]
-        mov String[di], al
-        inc StringPtr
-        
-        inc di
-        inc si        
-        cmp si, 4
-        jne wrPi
-        
-    jmp NOKEYREG
-
-nextButton9:    
     ;jmp ByteKeys         
     
     ;----------------------------------------------------------------------
@@ -2586,12 +2440,9 @@ ByteKeys:                           ; print for display
     mov String[di], al
     inc StringPtr                     
    
-NOKEYREG:
+;NOKEYREG:
     xor di, di
     xor si, si
-    
-    and input, 0
-    and upperIn, 0
     
     ret
 Math_Operators endp 
@@ -2600,7 +2451,9 @@ _DetectKeys proc
     ; This function get keys from keyboard to temporarily save into var
     xor ax, ax                   
     mov al, input                   ; this AL input print without AH value    
-
+ 
+    mov si, StringPtr
+ 
     call _Constraint
     
     call Math_Operators           ; separated function for all +-*/ 
@@ -2619,17 +2472,16 @@ OP_END:
     ret   
 _DetectKeys endp    
 ;----------------------------------------------------------------
-
-;----------------------------------------------------------------
 _BackSpace proc
     cmp inPtr, 0                    ; avoid si turn FF FF
     jne HAS_BSPC
     jmp NO_BSPC                     ; jump out of range
 
 HAS_BSPC:    
-    mov si, inPtr                   
+    mov si, inPtr                   ; add to clear sqrt infront numbers <<<<<<<<<
     mov di, StringPtr 
     
+    cld  
     mov al, "$"             
     mov tempStr[si-1], al           ; replace current with $
     dec inPtr                       ; for string position 
@@ -2657,30 +2509,14 @@ HAS_BSPC:
     ;mov al, tempStr[si-1]
     mov al, String[si-1] 
     
-    cmp al, "s"
-    je DECPTR
-    cmp al, "q"
-    je DECPTR
-    cmp al, "e"
-    je DECPTR
-    cmp al, "p"
-    je DECPTR
-    cmp al, "I"
-    je DECPTR 
-    cmp al, "S"
-    je DECPTR
-    cmp al, "C"
-    je DECPTR                                    
-    cmp al, "T"
-    je DECPTR
-    cmp al, "."              
+    cmp al, "."                 ; dec tPtr here <<<<<<<<<<<<<<<<<<<<<<<<
     je DECPTR    
     cmp al, "("
     je NOTNUM
     cmp al, ")"
     je SETF
     cmp al, "!"
-    je DECPTR        
+    je DECPTR 
     
     sub al, 30h    
     cmp al, 0
@@ -2702,7 +2538,8 @@ HAS_BSPC:
         mov opF, al
         
         SETDF:             
-            and DigitF, 0       
+            and DigitF, 0 
+            
             jmp OUTC2                                 
             
         DECPTR:
@@ -2712,14 +2549,18 @@ HAS_BSPC:
             INNERBRAC:                      ; if (0. then set digitF, 0
                 mov bl, "("
                 cmp bl, String[si-2]       ; else it is 10, 100, 1000 ..
-                je SETDF                        
+                je SETDF        
+                
 SETF:           
     or DigitF, 1     
-    dec tPtr      
+    dec tPtr    
+    
     cmp si, 1
-    jz SETDF                                 
+    jz SETDF
+                                      
 OUTC2:     
-    ;-----------------------------------------   
+    ;-----------------------------------------
+    
     cmp inPtr, 0                    
     jne NO_BSPC
              
@@ -2727,7 +2568,8 @@ OUTC2:
     mov dl, 30h    
     int 21h 
     
-    and DigitF, 0         
+    and DigitF, 0    
+       
 NO_BSPC:          
     ret
 _BackSpace endp    
@@ -2804,24 +2646,9 @@ _onPress proc
 _onPress endp   
 ;----------------------------------------------------------------
 _Constraint proc
-    ; term == 0, accept all keys, if AL != 0 then for all set flag                                
+    ; term == 0, accept all keys, if AL != 0 then for all set flag       
+                            
     ; if AL == 1 ~ 9
-    cmp al, "s"
-    je NOTZ
-    cmp al, "q"
-    je NOTZ
-    cmp al, "e"
-    je NOTZ
-    cmp al, "p"
-    je NOTZ
-    cmp al, "I"
-    je NOTZ 
-    cmp al, "S"
-    je NOTZ
-    cmp al, "C"
-    je NOTZ
-    cmp al, "T"
-    je NOTZ
     cmp al, "."
     je NOTZ
     cmp al, "("
@@ -2829,7 +2656,7 @@ _Constraint proc
     cmp al, ")"
     je NOFLAG
     cmp al, "!"
-    je NOTZ    
+    je NOTZ
             
     sub al, 30h                 ; al < 0 skip flag
     cmp al, 0

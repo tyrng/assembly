@@ -8,8 +8,7 @@
     scr_x dw 160  
     Def_size dw 320  
       
-; Input Variable =========================================================== 
-    gradient_sign dw 1                  ; sign of gradient           
+; Input Variable ===========================================================            
     gradient dw 1                  ; gradient of the line
     x dw -60                        ; starting point of 'x'
     times dw 1                      ; this is a skalar y=kx, which 
@@ -29,10 +28,7 @@
     base_gradient dw 1              ; base sign    
     exp_gradient dw 1               ; e^nx
     ExpDiv dw 2                     ; e^x/n
-    ExpSign dw 1                    ; sign for exp   
-;Input =======================================================================    
-    StoreNum db 10 dup ("$")        ; store all numbers 
-    xFlag db 0                      ; use X only once
+    ExpSign dw 1                    ; sign for exp
     
     ; Polynomial a(x+b)+c
     ;C dw ?                          ;y=+C
@@ -62,9 +58,7 @@ main proc
     ;mov bx, 0107h           ; bigger resolution
     ;int 10h
     
-    ;call _Axis              ; color works well on emu8086 but not dosbox.. 
-    
-    call _Equation      
+    ;call _Axis              ; color works well on emu8086 but not dosbox..       
  
     call _Adjustment    
  
@@ -92,7 +86,7 @@ plot_graph:
     call _Parameter_X       ; set x and y coordinates     
     
     xor cx, cx
-    cmp exp, 'X'            ; exponential function
+    cmp exp, 'x'            ; exponential function
     je Exponential
     
     cmp exp, -1
@@ -350,7 +344,7 @@ _Adjustment proc
     ; Times adjustment for later division  
     xor cx, cx   
     mov cl, exp              ; set for all graph gradient 
-    cmp cl, 'X'
+    cmp cl, 'x'
     jne set_range            ; NOT EQUAL
 ; -------------------------------------------------------------------------
     mov ax, gradient
@@ -501,133 +495,19 @@ _Equation proc
     ; 7. scans if next index has ( else then only X or R 
     ; 8. if has ( next has to be X and /, end with )     
     ; 9. if has ( next has is a number then followed with x 
-    ; 10. after ) can add + and - and /      
+    ; 10. after ) can add + and - and /    
     mov ah, 2
     mov dl, "Y"
-    int 21h 
-    
-    mov ah, 2
-    mov dl, "="
     int 21h
     
-Fx_In:     
-    mov ah, 1
-    int 21h
+    ;mov ah, 0Ah
+    ;lea dx, EquationInput
+    ;int 21h
     
-    cmp al, '^'
-    je Fx_pow
     
-    cmp al, '/'
-    je Fx_div
     
-    cmp al, 'X'
-    je Fx_var 
     
-    cmp al, 0Dh
-    je Fx_Ext
-    
-    sub al, 30h
-          
-    cmp al, 0         
-    jae Fx_Num
-    cmp al, 9
-    jbe Fx_Num
-    
-    jmp Fx_In
-    
-Fx_var:          
-    or xFlag, 1                 ; X variable only once
-    jmp Fx_in 
-    
-Fx_Num:           
-    mov bl, "1"
-    ;mov asciiIn[2], bl
-                            
-    xor si, si
-    loopHex:     
-        mov ah, 1
-        int 21h
-        
-        sub al, 30h
-        
-        cmp al, 0
-        jb outNum
-        cmp al, 9
-        ja outNum
-        
-        add al, 30h
-            
-        ;mov asciiIn[si], al
-        inc si             
-        
-        jmp loopHex
-    
-    outNum:       
-        ;call ASCIITOHEX
-            
-        ;mov ax, asciiHex[2]         ; ax = gradient
-        imul gradient_sign
-        mov gradient, ax 
-        
-        xor si, si             
-        
-    jmp Fx_In
-    
-negSign:
-    cmp xFlag, 0                ; 1 = Normal graph, 0 = Exp
-    jz Fx_Exp
-        
-        neg gradient_sign
-        jmp Fx_In
-    
-    Fx_Exp:
-        neg ExpSign
-        jmp Fx_In
-         
-Fx_Pow:      
-    ; print ^( after type ^
-    mov bl, "1"
-    ;mov asciiIn[2], bl 
-    
-    cmp xFlag, 0                
-    jz Fx_xExp
-                
-        mov bl, 'X'               
-        mov exp, bl
-        jmp Fx_In
-    
-    loop_xExp:    
-        mov ah, 1
-        int 21h  
-        
-        sub al, 30h
-        
-        cmp al, 0
-        jb outNum1
-        cmp al, 9                  ;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< STOPPED hEre
-        ja outNum1
-        
-        add al, 30h
-            
-        ;mov asciiIn[si], al
-        ;inc si             
-        
-        jmp loop_xExp
-    
-    outNum1:       
-        ;call ASCIITOHEX
-            
-        ;mov ax, asciiHex[2]         ; ax = gradient
-        imul ExpSign
-        mov exp_gradient, ax 
-        
-        xor si, si             
-        
-    jmp Fx_In
-        
-        
-
-Fx_Ext:    
+     
     
     ret               
 _Equation endp                
