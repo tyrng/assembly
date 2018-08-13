@@ -278,6 +278,10 @@ squareRoot dw ?
 ;Input =======================================================================    
     xFlag db 0                      ; use X only once 
     bracFlag db 0                   ; ?
+    ARRAY LABEL BYTE
+    max db 10 dup ("$")
+    act db ?
+    Value db 10 dup ("$")
     
     ; Polynomial a(x+b)+c
     ;C dw ?                          ;y=+C
@@ -2985,6 +2989,12 @@ _Calc_UI proc
 _Calc_UI endp 
 ;START GRAPH =================================================================
 _Setup proc
+
+inFormula:      
+    call cls
+    ;call _clearVariable
+    call _Equation   
+     
     push es
                   
     out 0F3h, ax                 
@@ -2994,24 +3004,31 @@ _Setup proc
     mov ax, 13h    
     int 10h    
        
+    call _Graph
+    
     ;mov ax, 4F02h           ; SUPER VGA MODE
     ;mov bx, 0107h           ; bigger resolution
     ;int 10h
     
     ;call _Axis              ; color works well on emu8086 but not dosbox.. 
-inFormula:    
-    call _Equation 
-    call _Graph
-    jmp inFormula      
+    
+    call Graph
+         
     ;------------------------------------------------
     mov ah, 1
-    int 21h   
+    int 21h 
+    
+    cmp ax, 011Bh
+    je outGraph  
     
     pop es                        
  
     mov ax, 3       ; return to text mode
     int 10h         ; auto cls
-       
+    
+    jmp inFormula 
+    
+outGraph:       
     ret  
 _Setup endp
  
@@ -3431,293 +3448,169 @@ skip_neg_1:
     ret
 _Parameter_Y endp
 ;===================================================================================
-_Equation proc             
-    mov ah, 2
-    mov dl, "Y"
-    int 21h 
-    
-    mov ah, 2
-    mov dl, "="
-    int 21h
-    
-    ;Base term                                        
-    ;set asciiIn to 1 if enters X at first
-    call _clearAscii
-                                        
-    xor si, si                                       
-    mov cx, 2           ; accept 2 integer for gradient
-GradientTerm:    
-    mov ah, 0
-    int 16h  
-    cbw    
-    
-    cmp al, '-'         ; if first is -
-    jne noNegGradient             
-    
-    mov dl, al
-    call printByte
-    
-    neg gradient_sign
-    jmp GradientTerm    ; back to scan number again
-    
-    noNegGradient: 
-        ;cmp al, '('         ; do next Term
-        ;je notNum1
-        ;cmp al, 'X'
-        ;je notNum1
-    
-        sub al, 30h             ; scans number
-        cmp al, 0
-        jb notNum1
-        cmp al, 9
-        ja notNum1 
-        add al, 30h                   
-        
-        mov asciiIn[si], al
-        inc si         
-        
-        mov dl, al
-        call printByte       
-        
-    loop GradientTerm
-    
-    notNum1:     
-        call ASCIITOHEX
-        mov ax, asciiHex[2]
-        mul gradient_sign
-        mov gradient, ax
-        
-        backTerm:    
-            mov ah, 1
-            int 21h
-            
-            cmp al, 'X'
-            je noNegBase            ; not iBase
-        
-            cmp al, '('
-            je outTerm0            ; if enters more than 1 then auto out
-    
-    jmp backTerm                ; select X or (
-    
-outTerm0: 
-    ; X and (-2) ====================================================   
-    ; clear asciiIn<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    
-    ;call _Graph    
-
-    call _clearAscii    
-    
-    xor si, si                                                      
-    ;mov cx, 1
-BaseTerm:                         
-    mov ah, 0
-    int 16h   
-    cbw                                                 
-    
-    cmp al, '-'
-    jne noNegBase   
-    
-    mov dl, al
-    call printByte      
-           
-    neg baseSign                ; negate iBase later
-    jmp BaseTerm                ; jump back to get number
-    
-    noNegBase:
-    
-        cmp al, 'X'
-        je xTerm             ; next will checks if ^ is entered  
-        
-        sub al, 30h             ; scans number
-        cmp al, 0
-        jb notNum2
-        cmp al, 9
-        ja notNum2 
-        add al, 30h                   
-        
-        mov asciiIn[si], al 
-        inc si     
-        
-        mov dl, al
-        call printByte                   
-        
-    ;loop BaseTerm 
-    
-    notNum2:
-        call ASCIITOHEX
-        mov ax, asciiHex[2]
-        mul baseSign
-        mov iBase, ax 
-        
-        mov dl, ")"
-        call printByte  
-        
-    jmp nextTerm    
-         
-xTerm:                    
-    or xFlag, 1
-;========================================
-nextTerm:                                               
-    mov bx, 1 
-    mov exp, bx     
-    
-    mov ah, 1
-    int 21h
-          
-    cmp al, '^'                 ; if no ^ then set exp to 1
-    je PowerTerm                          ; go out
-    
-    jmp endEquation                                          
-;========================================     
-PowerTerm: 
-    mov dl, '('
-    call printByte 
-
-    call _clearAscii    
-               
-    xor si, si              
-    mov cx, 2   
-ExpTerm:  
-    mov ah, 0                   ; no echo
-    int 16h 
-    cbw
-    
-    cmp al, '-'
-    jne noNegExp                         
- 
-    mov dl, al
-    call printByte
-    
-    neg ExpSign
-    jmp ExpTerm
-    
-    noNegExp:      
-    
-        cmp xFlag, 0                ; skip divide for Flag 1
-        jnz skipDiv
-
-        cmp al, '/'                 ; inner divide
-        je notNum3                 ; do ExpDiv
-           
-        skipDiv:
-            cmp al, ')'                 ; exit to see if theres divide
-            je notNum3                         
-            
-            sub al, 30h
-            cmp al, 0
-            jb notNum3              ; change this notnum to error checickeifjgijfw <<<<<<<<<<<
-            cmp al, 9
-            ja notNum3 
-            add al, 30h                   
-                                   ; add err check <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-            mov asciiIn[si], al
-            inc si               
- 
-        mov dl, al                  ; print number
-        call printByte
-        
-        loop ExpTerm 
-        
-    notNum3:  
-        call ASCIITOHEX
-        mov ax, asciiHex[2]
-        mul ExpSign
-        mov exp, ax     
-        
-    cmp xFlag, 0                ; Flag 0 = do Exp
-    jz FxExpDiv                 
-    
-    xor ax, ax
-    jmp divTerm
-    ; ---------------------------------------   
-    FxExpDiv:     
-        mov dl, "X"
-        call printByte
-                      
-        call _clearAscii
-        
-        xor si, si
-        mov cx, 5 
-        ExpDivTerm:     
-            mov ah, 1
-            int 21h    
-            cbw   
-            
-            cmp al, '/'
-            je ExpDivTerm                   
-            cmp al, ')'
-            je notNum4
-                           
-            sub al, 30h             ; scans number
-            cmp al, 0
-            jb notNum4
-            cmp al, 9
-            ja notNum4 
-            add al, 30h                   
-            
-            mov asciiIn[si], al
-            inc si                               
-                                    
-            loop ExpDivTerm      
-                        
-    notNum4:
-        call ASCIITOHEX
-        mov ax, asciiHex[2]
-        mov ExpDiv, ax                                          
-                     
-;========================================    
-divTerm:                                  
-    cmp xFlag, 1                ; Flag 1 = do Exp
-    jnz printbrac    
-        
-    mov ah, 2
-    mov dl, "X"
-    int 21h 
-     
-    printbrac:
-        mov dl, ")"
-        call printByte
-              
-    call _clearAscii        
-    
+_Equation proc     
     xor si, si
-    mov cx, 5    
-    FxDiv:
-        mov ah, 1
-        int 21h
+    
+Fx_In:              
+    xor cx, cx
+    
+    mov ah, 0Ah 
+    lea dx, Value
+    int 21h    
+    
+    call _clearAscii
+    
+    cmp si, 0
+    jne nextInput 
+    
+    xor di, di              ;gradient   1 
+    mov cl, act
+    toHex:     
+        mov bl, Value[di]  
         
-        cmp al, '/'
-        je FxDiv
-                       
-            cmp al, 0Dh
-            je notNum5
-                                  
-            sub al, 30h             ; scans number
-            cmp al, 0
-            jb notNum5
-            cmp al, 9
-            ja notNum5 
-            add al, 30h                   
+        cmp bl, '-'
+        jne skipNegGradient
+            neg gradient_sign
+            inc di
+            jmp toHex
             
-            mov asciiIn[si], al
-            inc si                
-            
-            loop FxDiv 
-            
-    notNum5:      
-        call ASCIITOHEX   
+    skipNegGradient:
+        mov asciiIn[di], bl 
+        inc di
+        loop toHex  
+        
+        call ASCIITOHEX  
         mov ax, asciiHex[2]
-        mov Times, ax                      
+        imul gradient_sign   
+        mov gradient, ax
+        inc di
+        
+    jmp Fx_In
+                            ;Base  2
+nextInput:   
+    cmp si, 1
+    jne nextInput2
+    
+    xor di, di 
+    mov cl, act
+    toHex2:
+        mov bl, Value[di]
+        
+        cmp bl, '-'
+        jne skipNegGradient2
+            neg baseSign
+            inc di
+            jmp toHex2
             
-endEquation:    
-    ret               
+    skipNegGradient2:
+        mov asciiIn[di], bl 
+        inc di
+        loop toHex  
+        
+        call ASCIITOHEX  
+        mov ax, asciiHex[2]
+        imul baseSign 
+        mov base_gradient, ax
+        inc di
+              
+    jmp Fx_In
+            
+nextInput2:                     ; exp 3
+    cmp si, 2
+    jne nextInput3
+    
+    xor di, di
+    mov cl, act
+    toHex3: 
+        mov bl, Value[di] 
+    
+        cmp bl, '-'
+        jne skipNegGradient3
+            neg expSign
+            inc di
+            jmp toHex
+            
+    skipNegGradient3:
+        mov asciiIn[di], bl 
+        inc di
+        loop toHex3  
+        
+        call ASCIITOHEX  
+        mov ax, asciiHex[2]
+        imul expSign    
+        mov exp, ax
+        inc di
+              
+    jmp Fx_In
+    
+nextInput3:                     ; times 4
+    cmp si, 3
+    jne nextInput4
+    
+    xor di, di
+    mov cl, act
+    toHex4: 
+        mov bl, Value[di] 
+        mov asciiIn[di], bl
+         
+        inc di
+        loop toHex4  
+        
+        call ASCIITOHEX  
+        mov ax, asciiHex[2] 
+        mov Times, ax
+        inc di
+              
+    jmp Fx_In
+
+nextInput4:                     ; Inv_x 5
+    cmp si, 4
+    jne nextInput5
+    
+    xor di, di
+    mov cl, act
+    toHex5: 
+        mov bl, Value[di] 
+        mov asciiIn[di], bl
+         
+        inc di
+        loop toHex5  
+        
+        call ASCIITOHEX  
+        mov ax, asciiHex[2] 
+        mov Inv_x, ax
+        inc di
+              
+    jmp Fx_In 
+    
+nextInput5:                     ; Exp Div 5
+    cmp si, 5
+    jne nextInput6
+    
+    xor di, di
+    mov cl, act
+    toHex6: 
+        mov bl, Value[di] 
+        mov asciiIn[di], bl
+         
+        inc di
+        loop toHex6  
+        
+        call ASCIITOHEX  
+        mov ax, asciiHex[2] 
+        mov ExpDiv, ax
+        inc di
+              
+    jmp Fx_In
+
+nextInput6:
+    ret          
 _Equation endp 
 ;===================================================================================
-clrGraph proc
-    pop dx   
-    pop dx
-    call _Setup
-clrGraph endp            
+_clearVariable proc
+    ;mov
+    ret
+_clearVariable endp            
 ;===================================================================================
 _clearAscii proc
     mov cx, 10   
