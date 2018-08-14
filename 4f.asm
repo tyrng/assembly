@@ -264,9 +264,6 @@ squareRoot dw ?
 ; Variables ================================================================== 
     x_axis dw ?                     ; x axis always double value of x 
     pow_x dw ?
-; y variables ---------------------------------------------------------------- 
-    pow_y dw ?
-    y dw ?                          ; value according to x
     
 ; Power Graph ===============================================================
     iBase dw 1                      ; Z base (with sign) 
@@ -276,13 +273,16 @@ squareRoot dw ?
     ExpSign dw 1                    ; sign for exp   
 ;Input =======================================================================    
     xFlag db 0                      ; use X only once 
+    errBool db 0                    ; error flag in graph
     
     ARRAY LABEL BYTE
     max db 16
     act db ?
-    Formula db 16 dup ("$") 
+    Formula db 16 dup ("$")         ; enter equation 
+    Buffer db 16 dup ("$")          ; clear formula 
     
-    err db "Check input error for invalid syntax $"
+    err db 40 dup (20h), "Check input error for invalid syntax! $"
+    Cont db 45 dup (20h), "Press q to exit, press any key to continue. $"
     
     ; Polynomial a(x+b)+c
     ;C dw ?                          ;y=+C
@@ -2153,12 +2153,14 @@ print proc
     mov ah, 9
     int 21h
     xor dx, dx
-    ret   
+    ret       
 
-printByte proc
-    mov ah, 2
-    int 21h
-    ret
+Throw proc
+    lea dx, err
+    call print
+    or errBool, 1
+    
+    ret    
 
 cursor proc
     mov ah, 2          
@@ -2484,37 +2486,73 @@ nextButton1:
     ; Log
 nextButton2:      
     cmp ax, array_button[10]
-    jne nextButton3  
-                     
-    mov si, inPtr 
-    xor bx, bx
-    mov cx, 1              
-    isDigit:                                ; check for operand
-        mov bl, tempStr[si-1]                                    
-        mov tempStr[si], bl                 ; tempStr[si+1] = tempStr[si]
-        
-        sub bl, 30h
-          
-        cmp si, 0                           ; if inPtr is 1-- = 0 then out
-        je noRep       
-              
-        jcxz noRep             
-        dec si                              ; update index                                                           
-        
-        ; if isDigit            
-        cmp bl, 0                       
-        jae isDigit
-        cmp bl, 9   
-        jbe isDigit
-        
-        loop isDigit
-noRep:          
-    add si, 2                                  ; add from above
-    ;else print q
-    mov al, 251                             ; al = ascii sqrt
-
-    jmp ByteKeys
+    je checkBrac   
     
+    jmp nextButton3                             ; jump issues
+    
+    checkBrac:                 
+        mov si, inPtr 
+        xor bx, bx 
+        mov cx, 1
+        xor di, di       
+                                                                      
+        mov bl, tempStr[si-1]                    ; check byte before
+        cmp bl, ')'                              ; if is bracket do bracket loop
+        je bracLoop 
+         
+        isDigit: 
+            cmp si, 0
+            jz addSI
+                   
+            dec si  
+                        
+            mov bl, tempStr[si]
+            mov tempStr[si+1], bl               
+                                                 
+            ; if isDigit 
+            sub bl, 30h
+            cmp bl, 0
+            jge nextRange                       ; stopped here not jump for not number
+            
+            nextRange:
+                cmp bl, 9
+                jbe isDigit        
+                
+            loop isDigit
+             
+            addSI:
+            inc si 
+            jmp noRep
+        ; -------------------------------     
+        bracLoop:
+            cmp si, 0
+            jz noRep
+                 
+            dec si  
+            
+            mov bl, tempStr[si]
+            mov tempStr[si+1], bl 
+            
+            cmp bl, ')'
+            jne bracCount
+            
+            inc di
+            
+            bracCount:            
+                cmp bl, '('
+                jne bracLoop
+
+                dec di
+                
+                cmp di, 0
+                jnz bracLoop
+                                                                   
+            loop bracLoop 
+            ;dec si                                                                                                                                                                  
+    noRep:         
+        mov al, 251                              ; add from above
+    
+        jmp ByteKeys
     ;----------------------------------------------------------------------
 nextButton3: 
     cmp ax, array_button[12]               
@@ -2546,8 +2584,6 @@ nextButton6:
                 
         mov tempStr[si+1], bl               ; tempStr[si+2] = tempStr[si]
         mov String[di+1], bl
-        
-        sub bl, 30h
           
         cmp si, 0                           ; if inPtr is 1-- = 0 then out
         je noRep2                               
@@ -2555,12 +2591,16 @@ nextButton6:
         jcxz noRep2
                                         
         dec si                              ; update index
-        dec di                                                               
-        ; if isDigit
-        cmp bl, 9            
-        jbe isDigit2 
-        cmp bl, 0                       
-        jae isDigit2 
+        dec di   
+                                                                    
+        ; if isDigit 
+        sub bl, 30h
+        cmp bl, 0
+        jge nextRange2
+        
+        nextRange2:
+            cmp bl, 9
+            jbe isDigit2  
         
         loop isDigit2
 noRep2:                  
@@ -2974,7 +3014,9 @@ _Calc_UI proc
 _Calc_UI endp 
 ;START GRAPH =================================================================
 _Setup proc
-Fx_In:    
+Fx_In: 
+    call _clearVar
+       
     push es
                   
     out 0F3h, ax                 
@@ -2984,7 +3026,10 @@ Fx_In:
     mov ax, 13h    
     int 10h    
     
-    call _Equation
+    call _Equation 
+    
+    cmp errBool, 1
+    je Halt
     
     call _Graph
     
@@ -2993,26 +3038,29 @@ Fx_In:
     ;int 10h
     
     ;call _Axis              ; color works well on emu8086 but not dosbox..      
-    ;------------------------------------------------
-    mov ah, 1
-    int 21h   
+
+Halt:    
+    pop es     
+ 
+    lea dx, Cont
+    call print
     
-    pop es 
+    mov ah, 1
+    int 21h     
     
     cmp al, 'q'
     je outFx
                             
     jmp Fx_In    
     
-outFx:
+outFx:       
     mov ax, 3       ; return to text mode
     int 10h         ; auto cls
-       
+    
     ret  
 _Setup endp
  
 _Graph proc
-    ;top
     call _Adjustment    
  
     mov ax, -2               ; double the x range and auto fix sign
@@ -3036,15 +3084,14 @@ Pos_Range:
 plot_graph:                                 
     push cx                 ; save counter 
 ;============================================================================                                                         
-    call _Parameter_X       ; set x and y coordinates     
+    call _Parameter         ; set x and y coordinates     
     
     xor cx, cx
     cmp xFlag, 0            ; exponential function
     jz Exponential
     
-    cmp exp, -1
-    jle Inverse
-    ;jg Function
+    cmp expSign, -1
+    js Inverse              ; previous is jle, test for js
     
     call _Function      ; function types here
     
@@ -3110,7 +3157,8 @@ _Function proc
     dec cx 
     
 PowerFX:                          ; exponential function 
-    mul pow_x
+    mul pow_x  
+    jo linear                   ; jump overflow
     loop PowerFX 
      
 linear:       
@@ -3124,13 +3172,15 @@ linear:
 Negative:                       ; no sign involve             
     div times                   ; ax=-3 now ax=3 so add
     mul gradient
+    mul gradient_sign
     add scr_y, ax
        
-    jmp exit_graph
-Positive:      
+    jmp exit_graph     
+Positive:    
     div times                   ; error here 1/3 is 0 integer 
-    mul gradient               
-    sub scr_y, ax                                           
+    mul gradient
+    mul gradient_sign               
+    sub scr_y, ax                                              
           
 exit_graph: 
     ret           
@@ -3150,47 +3200,19 @@ _Inverse proc
  
     mul times   
     div pow_x                    ; Negative
-    mul gradient   
+    mul gradient
+    mul gradient_sign   
     add scr_y, ax
-    
-    jmp Inv_Y_axis               
-    ;jmp exit_graph              ; remove extra one and enable this code
+                  
+    jmp exit_Inv_graph            
 Inv_Positive: 
     mul times        
     div pow_x                    ; Positive
     mul gradient
+    mul gradient_sign
     sub scr_y, ax 
-    
-    ;jmp exit_graph
-; Extra Precise line plotting ==================  
-Inv_Y_axis:               
-    push x
-    pop y   
-    
-    call _Pixel                 ; color from above
-    
-    call _Parameter_Y           ; delete the function if no need for extra line plotting
-    mov ax, Inv_x 
-    cwd      
-    
-    cmp y, 0
-    jz exit_Inv_graph
-    jg Inv_Negative
-    
-    mul times
-    div pow_y
-    mul gradient
-    add scr_x, ax    
-    
-    jmp exit_Inv_graph  
-    
-Inv_Negative: 
-    mul times
-    div pow_y
-    mul gradient
-    sub scr_x, ax                   
-;==================================================
-exit_Inv_graph:    
+
+exit_Inv_graph:
     ret
 _Inverse endp
 ;===================================================================================
@@ -3268,7 +3290,7 @@ base_sign:
 Exp_Positive:                   ; positive exp  
     mul gradient
     div times                   
-    ;mul gradient
+    mul gradient_sign
     mul baseSign      
     sub scr_y, ax    
     
@@ -3277,7 +3299,7 @@ Exp_Positive:                   ; positive exp
 Exp_Negative:                   
     mul gradient
     div times                   
-    ;mul gradient                ; divide overflow
+    mul gradient_sign           ; divide overflow
     mul baseSign        
     add scr_y, ax               ; go down
 
@@ -3285,15 +3307,13 @@ exit_exp:
     ret       
 _Exponential endp 
 ;===================================================================================
-_Adjustment proc
-    ; Times adjustment for later division  
+_Adjustment proc     
     cmp xFlag, 0
-    jnz set_range            ; NOT EQUAL
+    jnz set_range            ; NOT EQUAL 
 ; -------------------------------------------------------------------------
     mov ax, gradient
     mov bx, times
-    div bx 
-    
+    div bx      
     cmp ax, 10
     jl noSetTimes   
     
@@ -3310,7 +3330,7 @@ _Adjustment proc
     add ax, ax
     mov times, ax
     
-    noSetTimes:
+    noSetTimes:    
         cmp iBase, -1            ; if base is 1 or -1 then times can be 1
         je skip_exp_set 
         cmp iBase, 1             ; if base is 1 or -1 then times can be 1
@@ -3333,48 +3353,58 @@ _Adjustment proc
 skip_exp_set:    
     jmp exit_set
 ; -------------------------------------------------------------------------
-set_range:    
-    cmp cl, 3               ; both -3 and 3 
+set_range:     
+    mov cx, exp
+    cmp cx, 3               ; both -3 and 3 
     jb exit_set 
     
-    sub cl, 3   
+    sub cx, 3   
     mov si, cx   
                                                                   
-    mov ax, 0Ah             ; x starts at negative
+    mov ax, 10               ; x starts at negative
     mov bx, ax              ; ax = bx                 
-                                                      
+    
+    mov cx, exp  
+    sub cx, 2                                                 
 mul_loop:                   ; x^3 = 10, x^4 = 100 x^5 = 1000
     mul bx
     jc stop_mul             ; this doesnt calculate minimum 'times' value for divide
     dec si  
     cmp si, 0
-    jne mul_loop   
+    loop mul_loop   
 
-stop_mul:                                                                
+stop_mul:   
+    div bx
+    and bx, bx                   ; clear sign flag                                          
     cmp ax, times                ; times has to be atleast x10 of x
     jle exit_set                 ; before was jbe, has sign flag 
                  
     ; else set times at least 100
     mov ax, x                ; minimum times value * 10
     neg ax 
-    cwd                      ; just to make sure, exp can go above 35  
-
+    cwd                      ; just to make sure, exp can go above 35
+    
+    div bx                   ; test<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
+    
+    mov cx, exp 
+    sub cx, 2
 loop_times:   
     mul bx                   ; bx = 0Ah from above
     jc stop_loop                         
     loop loop_times 
                                           
-stop_loop:    
+stop_loop:  
     add x, bx                ; reduce bx by 10 <<<<<<<<<<<<<<<<<, remove if no use
     
+    div bx
     xor dx, dx               ; lower ax into times 
-    mov times, ax   
+    mov times, ax 
 ; -------------------------------------------------------------------------                  
 exit_set:                              
     ret
 _Adjustment endp    
 ;===================================================================================
-_Parameter_X proc               ; this function sets x and y and neg signed values
+_Parameter proc               ; this function sets x and y and neg signed values
     ; x variable -----------------------------------------
     push coordxy[0]         
     pop scr_x                   ; set x screen coordinate 
@@ -3398,33 +3428,33 @@ _Parameter_X proc               ; this function sets x and y and neg signed valu
     neg pow_x                   ; no overflow cause         
 skip_neg:                                                         
     ret
-_Parameter_X endp 
+_Parameter endp 
 ;===================================================================================
-_Parameter_Y proc
-    ; y variable --------------------------------------------------
-    push coordxy[2]         
-    pop scr_y                   ; set x screen coordinate 
-   
-    mov bx, y                   ; bx=-20 
-    and bx, bx                  ; set sign flag
-    add scr_y, bx               ; 160-20   
-    inc y                       ; y starts from -20 to positive 20  
-    inc scr_y
-   
-    ; x variable ----------------------------------------- 
-    push coordxy[0]        
-    pop scr_x                   ; put y for screen position   
-    
-    push y
-    pop pow_y                   ; set pow_y from y
-    
-    cmp y, 0
-    jge skip_neg_1                ; if y is negative then negate pow_y, avoid div overflow
-  
-    neg pow_y                   ; no overflow cause  
-skip_neg_1:   
-    ret
-_Parameter_Y endp
+;_Parameter_Y proc
+;    ; y variable --------------------------------------------------
+;    push coordxy[2]         
+;    pop scr_y                   ; set x screen coordinate 
+;   
+;    mov bx, y                   ; bx=-20 
+;    and bx, bx                  ; set sign flag
+;    add scr_y, bx               ; 160-20   
+;    inc y                       ; y starts from -20 to positive 20  
+;    inc scr_y
+;   
+;    ; x variable ----------------------------------------- 
+;    push coordxy[0]        
+;    pop scr_x                   ; put y for screen position   
+;    
+;    push y
+;    pop pow_y                   ; set pow_y from y
+;    
+;    cmp y, 0
+;    jge skip_neg_1                ; if y is negative then negate pow_y, avoid div overflow
+;  
+;    neg pow_y                   ; no overflow cause  
+;skip_neg_1:   
+;    ret
+;_Parameter_Y endp
 ;===================================================================================
 _Equation proc             
     mov ah, 2
@@ -3448,7 +3478,8 @@ _Equation proc
     cmp bl, '-'
     jne noNegGradient
     
-    neg gradient_sign  
+    neg gradient_sign
+    inc si  
         
     noNegGradient: 
         mov bl, Formula[si]         ; si++
@@ -3461,25 +3492,18 @@ _Equation proc
         cmp bl, '('
         je ExpBase
         
-        sub bl, 30h
-        cmp bl, 9
-        ja error1
-        cmp bl, 0
-        jl error1         
-        add bl, 30h 
-        
-        ; convert gradient to base
-        mov asciiIn[di], bl 
-        inc di
-        inc si
+        call getNumber
         
         jmp noNegGradient  
-        ; ====================================================
-        error1:       
-            lea dx, err
-            call print
-            jmp outE 
-        ExpBase:
+        
+        ExpBase: 
+            ; checks if input is (X)
+            inc si
+            mov bl, Formula[si]
+            cmp bl, 'X'
+            je LinearFx
+            dec si
+            
             jmp ExpFx    
         ; ====================================================           
         ; Normal Graph =======================================
@@ -3492,7 +3516,6 @@ _Equation proc
             pop si
                    
             mov ax, asciiHex[2]
-            mul gradient_sign
             mov gradient, ax 
             
             inc si
@@ -3504,21 +3527,26 @@ _Equation proc
             
             ; else set exp == 1
             mov ax, 1
-            mov exp, ax
+            mov exp, ax 
+ 
+            ; end checking           
+            ; cmp bl, 0Dh 
             
             ; end formula without exp
             jmp outE        
             ; ====================================================
-            hasExp:
+            hasExp:  
                 inc si
-                
                 ; check for (
                 mov bl, Formula[si]
                 cmp bl, '('
-                jne error1
+                je noErr
                 
+                call Throw
+                jmp outE
+                
+            noErr:
                 inc si
-                                             
                 ; check for exp sign
                 mov bl, Formula[si]
                 cmp bl, '-'
@@ -3526,39 +3554,25 @@ _Equation proc
                 
                 neg ExpSign
                 
-                inc si 
-                         
-                ;else proceed to find for expdiv
-                call _clearAscii 
-                xor di, di                      
-                noNegExp:    
+                inc si  
+                                            
+                noNegExp:
+                    ;else proceed to find for expdiv
+                    ;inc si 
+                    call _clearAscii
+                addExp1:    
                     ; checks only for whole number, fraction not supported
                     mov bl, Formula[si]
                     
-                    sub bl, 30h
-                    cmp bl, 9
-                    ja error2
-                    cmp bl, 0
-                    jl error2         
-                    add bl, 30h
-                    
-                    ; convert gradient to base
-                    mov asciiIn[di], bl   
-                    inc di
-                    inc si   
+                    call getNumber   
                     
                     ; ends with ) end exp for normal graph
                     mov bl, Formula[si]
                     cmp bl, ')'
                     je endExp
                     
-                    jmp noNegExp   
-                    ; ====================================================
-                    error2:       
-                        lea dx, err
-                        call print
-                        jmp outE
-                    ; ====================================================                       
+                    jmp addExp1   
+        ; ========================================================                                   
         endExp:            
             ; convert ExpDiv for normal graph 
             push si
@@ -3566,7 +3580,6 @@ _Equation proc
             pop si
             
             mov ax, asciiHex[2]
-            mul ExpSign
             mov exp, ax 
             
             inc si 
@@ -3583,7 +3596,7 @@ _Equation proc
                 jmp outE
  ;=================================================================                   
         ; Exp Function ==============================================     
-        ExpFx:      
+        ExpFx:              
             ; xFlag 0 = Exp
             and xFlag, 0                
                        
@@ -3593,7 +3606,6 @@ _Equation proc
             
             ;set for gradient       
             mov ax, asciiHex[2]
-            mul gradient_sign
             mov gradient, ax
             
             inc si        
@@ -3607,26 +3619,14 @@ _Equation proc
             
             inc si    
             
-            noNegBase:
-                call _clearAscii 
-                xor di, di
-                
+            noNegBase: 
+                ;inc si
+                call _clearAscii
             addBase:
                 ;check for iBase
                 mov bl, Formula[si] 
                 
-                ; start with number
-                sub bl, 30h
-                cmp bl, 9
-                ja error3
-                cmp bl, 0
-                jl error3         
-                add bl, 30h
-                
-                ;convert iBase to Hex
-                mov asciiIn[di], bl  
-                inc di
-                inc si 
+                call getNumber 
                 
                 ; after assigning number find if )
                 mov bl, Formula[si]         ; si++
@@ -3635,39 +3635,35 @@ _Equation proc
                 cmp bl, ')'
                 je setBase
                 
-                jmp addBase 
-                ; ====================================================
-                error3:       
-                    lea dx, err
-                    call print
-                    jmp outE
-                ; ==================================================== 
+                jmp addBase
+                ; =================================================== 
                 setBase:
-                    inc si              ; si ++ check ) close 
-                    
                     ; set iBase 
                     push si
                     call ASCIITOHEX
                     pop si
                            
                     mov ax, asciiHex[2]
-                    mul baseSign
                     mov iBase, ax 
                     
                     inc si
                     
-                    ;next must end with X
+                    ;next must end with ^
                     mov bl, Formula[si]         ; si++
                     cmp bl, '^'
-                    jne error3
+                    jne err4
 
                     inc si
-                    
                     ; check for (
                     mov bl, Formula[si]
                     cmp bl, '('
-                    jne error3
-            
+                    je noErr2
+                    
+                    call Throw
+                    jmp outE
+                    
+                noErr2:
+                    inc si
                     ; check for exp sign
                     mov bl, Formula[si]
                     cmp bl, '-'
@@ -3675,38 +3671,23 @@ _Equation proc
                     
                     neg ExpSign
                     
-                    inc si 
-                             
-                    ;else proceed to find for expdiv
-                    call _clearAscii   
-                    xor di, di                     
+                    inc si  
+                         
                     noNegExp2:
+                        ;else proceed to find for expdiv
+                        ;inc si
+                        call _clearAscii 
+                    addExp2:
                         mov bl, Formula[si]
                         
                         ; if next is not number then jmp to error
                         cmp bl, 'X'
                         je setExp
                         
-                        ; start with number
-                        sub bl, 30h
-                        cmp bl, 9
-                        ja error4
-                        cmp bl, 0
-                        jl error4         
-                        add bl, 30h
+                        call getNumber   
                         
-                        ; convert for Exp gradient
-                        mov asciiIn[di], bl  
-                        inc di
-                        inc si   
-                        
-                        jmp noNegExp
+                        jmp addExp2
                         ; ==============================================
-                        error4:       
-                            lea dx, err
-                            call print
-                            jmp outE 
-                        ; ====================================================
                         setExp:       
                             push si
                             call ASCIITOHEX
@@ -3717,49 +3698,50 @@ _Equation proc
                             mul ExpSign
                             mov exp, ax
                         
-                            inc si 
-                            
-                            ; checks if ) and end
-                            mov bl, Formula[si]
-                            cmp bl, ')'
-                            je endExp2
-                            
                             inc si
                             
-                            ; else check for /
+                            ; inner bracket divide
                             mov bl, Formula[si]
                             cmp bl, '/'
                             je ExpDivFx
                             
-                            ; no match then error
-                            jmp error4
-                            ; =======================================
+                            ; checks if ) and end
+                            mov bl, Formula[si]
+                            cmp bl, ')'
+                            jne err4                           
+ 
+                            inc si
+                            
+                            ; base divide
+                            mov bl, Formula[si]
+                            cmp bl, '/'
+                            je DivFx
+                            
+                            ; end of formula    
+                            mov bl, Formula[si]
+                            cmp bl, 0Dh 
+                            je outE
+                            
+                            ; other key scans as error
+                            ;------------------------
+                            err4:
+                                call Throw
+                                jmp outE
+                            ;------------------------
                             ExpDivFx:
                                 inc si     
-                                xor di, di
                                 call _clearAscii
-                                addExp:
-                                    mov bl, Formula[si] 
-                                    
-                                    ; start with number
-                                    sub bl, 30h
-                                    cmp bl, 9
-                                    ja error4
-                                    cmp bl, 0
-                                    jl error4         
-                                    add bl, 30h
-                                    
-                                    ; convert gradient to base
-                                    mov asciiIn[di], bl
-                                    inc di
-                                    inc si 
-                                    
-                                    mov bl, Formula[si]
-                                    cmp bl, ')'
-                                    je endExp2 
-                                    
-                                    jmp addExp                                
-                        
+                            addExpDiv:
+                                mov bl, Formula[si] 
+                                
+                                call getNumber 
+                                
+                                mov bl, Formula[si]
+                                cmp bl, ')'
+                                je endExp2 
+                                
+                                jmp addExpDiv                                
+    ; ====================================================                
     endExp2:
         ; convert ExpDiv for Exp graph 
         push si
@@ -3774,52 +3756,65 @@ _Equation proc
         ; check if has / next           
         mov bl, Formula[si]
         cmp bl, '/'
-        je DivFx
+        je DivFx 
         
-        jmp outE
-        ; ====================================================
-        error5:
-            lea dx, err
-            call print
-            jmp outE
-        ; ====================================================                          
+        ; if no then check if last is 0Dh
+        ; cmp bl, 0Dh
+        
+        jmp outE                          
 DivFx: 
     inc si   
-    xor di, di
     call _clearAscii
-    addTimes:
-        mov bl, Formula[si]
+addTimes:
+    mov bl, Formula[si]
+    
+    call getNumber
+    
+    mov bl, Formula[si] 
+    cmp bl, 0Dh 
+    je setTimes    
+    
+    jmp addTimes
+    
+    setTimes:         
+        push si
+        call ASCIITOHEX                      
+        pop si
         
-        ; start with number
-        sub bl, 30h
-        cmp bl, 9
-        ja error5
-        cmp bl, 0
-        jl error5         
-        add bl, 30h
-        
-        ; convert gradient to base
-        mov asciiIn[di], bl
-        inc di
-        inc si   
-        
-        mov bl, Formula[si] 
-        cmp bl, "$"
-        je setTimes    
-        
-        jmp addTimes
-        
-        setTimes:         
-            push si
-            call ASCIITOHEX                      
-            pop si
-            
-            mov ax, asciiHex[2]   
-            mov Times, ax 
+        mov ax, asciiHex[2]   
+        mov Times, ax 
 outE:    
     ret      
-_Equation endp
-_clearVar proc           
+_Equation endp               
+;===================================================================================
+getNumber proc
+    ; start with number
+    sub bl, 30h
+    cmp bl, 9
+    ja error
+    cmp bl, 0
+    jl error         
+    add bl, 30h
+    
+    ; convert gradient to base
+    mov asciiIn[di], bl
+    inc di
+    inc si 
+    
+    ret 
+error:        
+    call Throw    
+    
+    ret    
+getNumber endp    
+;=================================================================================== 
+_clearVar proc 
+    xor cx, cx
+    lea di, Buffer
+    lea si, Formula
+    mov cl, max
+    rep movsb
+               
     mov ax, 1    
           
     mov Times, ax
@@ -3832,7 +3827,11 @@ _clearVar proc
     mov BaseSign, ax
     
     and base, 0
-    and xFlag, 0 
+    and xFlag, 0
+    and errBool, 0 
+    
+    mov bx, -60
+    mov x, bx
     
     xor di, di
     xor si, si
